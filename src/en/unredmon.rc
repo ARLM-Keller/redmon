@@ -39,5 +39,6 @@ Disconnect all printers from this port then delete the port.")
 	IDS_ERROR_DELETE_DLL, TEXT("Can't delete monitor DLL. Error = %d.")
 	IDS_ERROR_DELETE_HELP, TEXT("Can't delete monitor help file. Error = %d.")
 	IDS_UNINSTALLED, TEXT("RedMon has been removed.")
+    IDS_ERROR_DELETE_REDCONF, TEXT("Can't delete redconf. Error = %d.")
 END
 

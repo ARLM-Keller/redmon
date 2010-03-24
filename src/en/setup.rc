@@ -40,5 +40,6 @@ BEGIN
 	IDS_ERROR_COPY_UNINSTALL, TEXT("Error copying uninstall program. Error = %d.")
 	IDS_ADDMONITOR_FAILED, TEXT("AddMonitor() failed. Error = %d. ")
 	IDS_INSTALL_OK, TEXT("Installation successful.")
+    IDS_ERROR_COPY_REDCONF, TEXT("Error copying redconf. Error = %d.")
 END
 

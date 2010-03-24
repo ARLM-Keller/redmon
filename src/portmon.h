@@ -36,9 +36,9 @@ extern int ntver;	/* 351, 400, 500 */
 #define DESCKEY TEXT("Description")
 
 /* to write a log file for debugging RedMon, uncomment the following line */
-/*
+
 #define DEBUG_REDMON
-*/
+
 
 
 /***********************************************************************/
@@ -58,6 +58,13 @@ LONG RedMonSetValue(HANDLE hMonitor, HANDLE hcKey, LPCTSTR pszValue,
     DWORD dwType, const BYTE* pData, DWORD cbData);
 LONG RedMonQueryValue(HANDLE hMonitor, HANDLE hcKey, LPCTSTR pszValue, 
 	PDWORD pType, PBYTE pData, PDWORD pcbData);
+
+BOOL WINAPI rcAddPortUI(PCWSTR pszServer, HWND hWnd, 
+                        PCWSTR pszPortNameIn, PWSTR *ppszPortNameOut);
+BOOL WINAPI rcConfigurePortUI(PCWSTR pszServer, HWND hWnd,
+                              PCWSTR pszPortNameIn);
+BOOL WINAPI rcDeletePortUI(PCWSTR pszServer, HWND hWnd,
+                           PCWSTR pszPortNameIn);
 
 void show_help(HWND hwnd, int id);
 

@@ -1,0 +1,3 @@
+This is a somewhat Windows 7 compatible version of the RedMon port monitor. It has not been exhaustively tested and the solution to the problem presented below is rather hacky, use at your own peril.
+
+The problem with the version of RedMon that is currently available on the internet is its incompatibility with UAC. When you try to configure it as a regular user, it will fail with error 0x00000001. This version corrects that by exporting all configuration functionality into an external application called "redconf". When Windows asks RedMon to perform UI actions, this program is launched as an elevated process (using the undocumented "runas" verb).

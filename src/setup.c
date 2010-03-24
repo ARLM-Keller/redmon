@@ -13,6 +13,8 @@
   to copy, modify and redistribute RedMon, but only under certain conditions 
   described in the Licence.  Among other things, the Licence requires that 
   the copyright notice and this notice be preserved on all copies.
+  
+  Modified in 2010 by Jonas Oberschweiber
 */
 
 /* RedMon setup program */
@@ -188,6 +190,12 @@ DWORD version = GetVersion();
      lstrcat(source, MONITORHLP);
      if (!CopyFile(source, destination, FALSE))
 	  return message(IDS_ERROR_COPY_HELP);
+     lstrcpy(destination, sysdir);
+     lstrcat(destination, REDCONF);
+     lstrcpy(source, exepath);
+     lstrcat(source, REDCONF);
+     if (!CopyFile(source, destination, FALSE))
+         return message(IDS_ERROR_COPY_REDCONF);
      lstrcpy(destination, sysdir);
      lstrcat(destination, UNINSTALLPROG);
      lstrcpy(source, exepath);
