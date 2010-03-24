@@ -1,0 +1,7 @@
+[OPTIONS]
+TITLE=RedMon - Moniteur de redirection de port
+BMROOT=binary
+[FILES]
+redmon.rtf
+[CONFIG]
+BrowseButtons()

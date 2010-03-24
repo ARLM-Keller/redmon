@@ -1,0 +1,149 @@
+/* Copyright (C) 1997-2000, Ghostgum Software Pty Ltd.  All rights reserved.
+  
+  This file is part of RedMon.
+  
+  This program is distributed with NO WARRANTY OF ANY KIND.  No author
+  or distributor accepts any responsibility for the consequences of using it,
+  or for whether it serves any particular purpose or works at all, unless he
+  or she says so in writing.  Refer to the RedMon Free Public Licence 
+  (the "Licence") for full details.
+  
+  Every copy of RedMon must include a copy of the Licence, normally in a 
+  plain ASCII text file named LICENCE.  The Licence grants you the right 
+  to copy, modify and redistribute RedMon, but only under certain conditions 
+  described in the Licence.  Among other things, the Licence requires that 
+  the copyright notice and this notice be preserved on all copies.
+*/
+
+/* redmon.rc */
+
+#include <windows.h>
+#include "redmonrc.h"
+
+STRINGTABLE
+BEGIN
+        IDS_MONITORNAME, "Redirected Port"
+	IDS_TITLE, "RedMon - Redirection Port Monitor"
+#ifdef BETA
+	IDS_BETAEXPIRED, "This BETA test version of RedMon has expired."
+#endif
+
+	IDS_ADDPORT, "Add Redirected Port"
+	IDS_NOTUNIQUE, "Port \042%s\042 is already used.  Please select a unique port name" 
+
+	IDS_CONFIGPROP, "%s Properties" 
+	IDS_CONFIGLOGFILE, "%s Log File Properties" 
+	IDS_CONFIGUNKNOWN, "Unknown Port Properties"
+	IDS_HELPFILE, "redmon.hlp"
+
+	/* These help strings must match the help file topic names */
+	IDS_HELPADD, "Add Port"
+	IDS_HELPCONFIG,"Port Settings"
+	IDS_HELPLOG, "Log File Properties"
+
+	/* These are the show window types */
+	IDS_SHOWNORMAL, "Normal"
+	IDS_SHOWMIN, "Minimized"
+	IDS_SHOWHIDE, "Hidden"
+
+	/* Possible output methods */
+	IDS_OUTPUTSELF , "Program handles output"
+	IDS_OUTPUTPROMPT, "Prompt for filename"
+	IDS_OUTPUTSTDOUT, "Copy stdout to printer"
+	IDS_OUTPUTFILE, "Copy temporary file to printer"
+	IDS_OUTPUTHANDLE, "Copy pipe to printer"
+
+	/* GetOpenFileName() filters */
+	IDS_FILTER_EXE, "Programs|*.exe;*.com|All Files (*.*)|*.*|"
+	IDS_FILTER_TXT, "Text Documents (*.txt)|*.txt|All Files (*.*)|*.*|"
+	IDS_FILTER_PROMPT, "All Files (*.*)|*.*|PRN Documents (*.prn)|*.prn|PDF Documents (*.pdf)|*.pdf|PostScript Documents (*.ps)|*.ps|"
+END
+
+IDD_ADDPORT DIALOG 48, 32, 192, 74
+STYLE DS_MODALFRAME | 0x4L | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add Redirected Port"
+FONT 8, "MS Sans Serif"
+{
+ LTEXT "Port Name", -1, 6, 6, 180, 10
+ EDITTEXT IDC_PORTNAME, 6, 18, 180, 12, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP | WS_CHILD
+ DEFPUSHBUTTON "OK", IDOK, 14, 52, 44, 14
+ PUSHBUTTON "Cancel", IDCANCEL, 74, 52, 44, 14
+ PUSHBUTTON "Help", IDC_HELPBUTTON, 134, 52, 44, 14
+}
+
+IDD_CONFIGPORT DIALOG 48, 32, 290, 195
+STYLE DS_MODALFRAME | 0x4L | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Configure Redirected Port"
+FONT 8, "MS Sans Serif"
+{
+ LTEXT "Redirect this port to the program:", -1, 8, 6, 180, 10
+ EDITTEXT IDC_COMMAND, 6, 18, 200, 12, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP | WS_CHILD
+ LTEXT "Arguments for this program are:", -1, 8, 40, 180, 10
+ EDITTEXT IDC_ARGS, 6, 52, 200, 12, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP | WS_CHILD
+ LTEXT "Output:", -1, 8, 83, 36, 8
+ COMBOBOX IDC_OUTPUT, 46, 80, 160, 54, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+ LTEXT "Printer:", IDC_PRINTERTEXT, 8, 103, 37, 10
+ COMBOBOX IDC_PRINTER, 46, 100, 160, 64, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+ AUTOCHECKBOX "Print Errors", IDC_PRINTERROR, 218, 101, 72, 12, BS_AUTOCHECKBOX | WS_TABSTOP
+ LTEXT "Run:", -1, 8, 123, 36, 8
+ COMBOBOX IDC_SHOW, 45, 120, 100, 44, CBS_DROPDOWNLIST | WS_TABSTOP
+ CHECKBOX "Run as User", IDC_RUNUSER, 163, 121, 110, 12, BS_AUTOCHECKBOX | WS_TABSTOP
+ LTEXT "Shut down delay:", -1, 8, 143, 72, 8
+ EDITTEXT IDC_DELAY, 83, 141, 24, 12
+ LTEXT "seconds", -1, 111, 143, 48, 8
+ DEFPUSHBUTTON "OK", IDOK, 16, 172, 44, 14
+ PUSHBUTTON "Cancel", IDCANCEL, 76, 172, 44, 14
+ PUSHBUTTON "Help", IDC_HELPBUTTON, 156, 172, 44, 14
+ PUSHBUTTON "Log File", IDC_LOGFILE, 224, 172, 50, 14
+ PUSHBUTTON "Browse", IDC_BROWSE, 224, 17, 50, 14
+}
+
+IDD_CONFIGLOG DIALOG 48, 32, 216, 112
+STYLE DS_MODALFRAME | 0x4L | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Configure Logfile"
+FONT 8, "MS Sans Serif"
+{
+ LTEXT "Write standard output to the file:", IDC_LOGNAMEPROMPT, 8, 31, 180, 10
+ EDITTEXT IDC_LOGNAME, 8, 43, 200, 12, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP | WS_CHILD
+ AUTOCHECKBOX "Debug", IDC_LOGDEBUG, 10, 66, 96, 12, BS_AUTOCHECKBOX | WS_TABSTOP
+ DEFPUSHBUTTON "OK", IDOK, 15, 90, 44, 14
+ PUSHBUTTON "Cancel", IDCANCEL, 75, 90, 44, 14
+ PUSHBUTTON "Help", IDC_HELPBUTTON, 135, 90, 44, 14
+ CHECKBOX "Use Log File", IDC_LOGUSE, 10, 12, 120, 12, BS_CHECKBOX | WS_TABSTOP
+ PUSHBUTTON "Browse", IDC_BROWSE, 157, 12, 50, 14
+}
+
+#ifdef UNUSED
+/* This is for Windows 95 */
+1 VERSIONINFO 
+FILEVERSION 1, 0, 0, 0
+PRODUCTVERSION 1, 0, 0, 0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEOS VOS_WINDOWS32
+FILETYPE VFT_DLL
+{
+ BLOCK "StringFileInfo"
+ {
+  BLOCK "040904E4"
+  {
+   VALUE "CompanyName", "Ghostgum Software Pty Ltd\000"
+   VALUE "FileDescription", "Redirected Port Monitor DLL\000"
+   VALUE "FileVersion", "1.20.00\000"
+   VALUE "InternalName", "redmon.dll\000"
+   VALUE "LegalCopyright", "Copyright \251 Ghostgum Software Pty Ltd. 1997-1998\000"
+   VALUE "OriginalFilename", "REDMON\000"
+   VALUE "ProductName", "RedMon - Redirected Port Monitor\000"
+   VALUE "ProductVersion", "1.20.00\000"
+  }
+
+ }
+
+ BLOCK "VarFileInfo"
+ {
+  VALUE "Translation", 1033, 1252
+ }
+
+}
+#endif
+
+/* end redmon.rc */

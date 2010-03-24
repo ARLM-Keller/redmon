@@ -1,0 +1,9 @@
+LIBRARY		REDMONNT
+DESCRIPTION	'Redirected Port Monitor for Windows NT 4.0 and 5.0'
+DATA		MULTIPLE SHARED 
+EXPORTS	
+		DllEntryPoint
+		DllMain
+		InitializePrintMonitor2
+		InitializePrintMonitorUI
+		InitializePrintMonitor

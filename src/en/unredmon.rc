@@ -1,0 +1,43 @@
+/* Copyright (C) 1997-2000, Ghostgum Software Pty Ltd.  All rights reserved.
+  
+  This file is part of RedMon.
+  
+  This program is distributed with NO WARRANTY OF ANY KIND.  No author
+  or distributor accepts any responsibility for the consequences of using it,
+  or for whether it serves any particular purpose or works at all, unless he
+  or she says so in writing.  Refer to the RedMon Free Public Licence 
+  (the "Licence") for full details.
+  
+  Every copy of RedMon must include a copy of the Licence, normally in a 
+  plain ASCII text file named LICENCE.  The Licence grants you the right 
+  to copy, modify and redistribute RedMon, but only under certain conditions 
+  described in the Licence.  Among other things, the Licence requires that 
+  the copyright notice and this notice be preserved on all copies.
+*/
+
+/* unredmon.rc */
+
+#include <windows.h>
+#include "redmonrc.h"
+#include "unredmon.h"
+
+1 ICON "binary\unredmon.ico"
+
+STRINGTABLE
+BEGIN
+	IDS_MONITORNAME, TEXT("Redirected Port")
+	IDS_TITLE, TEXT("RedMon - Redirection Port Monitor")
+	IDS_INTRO, TEXT("Do you want to remove the RedMon redirection port monitor?")
+	IDS_INUSE, TEXT("Monitor has NOT been removed.\n\
+The %s port provided by this monitor is still being used.\n\
+Disconnect all printers from this port then delete the port.") 
+	IDS_ENUMPORTS_FAILED, TEXT("EnumPorts() failed. Error = %d.")
+	IDS_ENUMMONITORS_FAILED, TEXT("EnumMonitors() failed. Error = %d.")
+	IDS_NOT_INSTALLED, TEXT("RedMon is not installed.")
+	IDS_DELETEMONITOR_FAILED, TEXT("DeleteMonitor() failed. Error = %d.")
+	IDS_NOSYSDIR, TEXT("Can't find system directory. Error = %d.")
+	IDS_ERROR_DELETE_DLL, TEXT("Can't delete monitor DLL. Error = %d.")
+	IDS_ERROR_DELETE_HELP, TEXT("Can't delete monitor help file. Error = %d.")
+	IDS_UNINSTALLED, TEXT("RedMon has been removed.")
+END
+

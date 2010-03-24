@@ -1,0 +1,7 @@
+[OPTIONS]
+TITLE=RedMon - Skrivarportsövervakare för omdirigering
+BMROOT=binary
+[FILES]
+redmon.rtf
+[CONFIG]
+BrowseButtons()

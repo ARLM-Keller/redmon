@@ -1,0 +1,502 @@
+ Skrivarövervakare för omdirigering av port
+1Översikt
+?Översikt
+ Skrivarövervakaren `RedMon` dirigerar om en speciell skrivarport
+ till valfritt program.
+ `RedMon` används vanligtvis tillsammans med Ghostscript för att ge
+ Postscript-funktionalitet till en skrivare som annars saknar sådan.
+
+ `RedMon` kan användas ihop med alla program som accepterar indata
+ direkt från terminal (standard input).
+
+ Genom att använda `RedMon` kan du skapa omdirigerade skrivarportar.
+ Om du ansluter en Windows-skrivardrivrutin till en sådan port kommer
+ all data som skrivs ut på den skrivaren att vidarebefodras av `RedMon`
+ till standard input hos det programmet. Det är sedan det programmets
+ ansvar att bearbeta dessa data och generera ny utdata.
+
+ En PostScript-skrivare i Windows omdirigerad till en `RedMon` port kan
+ delas ut i ett nätverk.
+ När skrivaren är konfigurerad att använda Ghostscript och en annan
+ icke-PostScript skrivare kommer den att för andra nätverksklienter
+ att se ut som en helt vanlig Postscript-skrivare.
+
+ `RedMon` stöder Windows 95, NT 4.0 and 3.51.
+
+ Att konfigurera `RedMon` är inte något som bör göras av oerfarna
+ användare.
+2Installation
+?Installation
+ Kör `setup.exe` för att installera den omdirigerande skrivarövervakaren
+ `RedMon`.
+ Filerna `setup.exe`, `redmon95.dll`, `redmonnt.dll`, `redmon35.dll`,
+ `redmon.hlp` och `unredmon.exe`
+ måste alla finnas i samma katalog.
+
+ För att installera `RedMon` under Windows NT krävs
+ Administratörsbehörighet.
+
+ Följ instruktionerna i `Ghostscriptexempel` för resten av
+ konfigureringen.
+2Avinstallation
+?Avinstallation
+ För att avinstallera, måste du först frikoppla alla skrivardrivrutiner
+ från de `Omdirigerade` portarna och sedan ta bort de `Omdirigerade`
+ portarna. Använd `Lägg till/ta bort program` på `Kontrollpanelen` för
+ att ta bort `RedMon`.
+2Lägg till port
+?Lägg till port
+ I dialogrutan `Lägg till omdirigerad port`, ange namn och beskrivning
+ på en port som skall hanteras av `RedMon`.
+ Per default, kommer den första porten du definierar kallas `RPT1:`
+ och dess beskrivning kommer att vara `Omdirigerad port`.
+
+ `Windows 95:` Efter att ha lagt till en port behöver du ändra
+ dess inställningar med `Portinställningar` och
+ `Spooler-inställ(ningar)`.
+ Alla skrivardrivrutiner kopplade till denna port `måste` i
+ `Inställningar för utskriftsbuffert` ha valet
+ `Inaktivera tvåvägsstöd för den här skrivaren` gjort.
+
+ `Windows NT:` Efter att ha lagt till en port behöver du ändra
+ dess inställningar med `Configure Port`. `Enable bidirectional support`
+ bör vara avstängt.
+
+ Du kan inte använda ett portnamn som redan finns.
+ Därför kan du inte skapa en omdirigerad port som kallas LPT1:
+2Inställningar för port
+?Inställningar för port
+?Konfigurera port
+ I dialogrutan `Inställningar för omdirigerad port` anger du ett
+ program som på standard input skall erhålla alla data som
+ skickas till denna port.
+ Programnamnet anges i det första textfältet och argumenten i
+ det andra textfältet.
+
+ `Utdata` från programmet kan hanteras på tre olika sätt.
+ `Programmet hanterar utdata`, `Skicka stdout till skrivare`,
+ `Kopiera temporärfil till skrivare` eller `Skicka kanal till skrivare`.
+ Väljer du något av de sista tre alternativen behöver du också välja en
+ `Skrivare`.
+
+ Om du väljer `Skriv ut fel` skapas en extra sida med felinformation
+ och skickas till skrivaren.
+
+ Programmet kan köras i tre lägen `Normal`, `Minimerad` eller `Dold`.
+
+ `Kör som Användare` är tillgängligt endast under Window NT och är
+ vanligtvis avstängt.
+
+ En `Loggfil` kan fås att erhålla de utdata och eventuella felmeddelanden
+ programmet skulle ha lämnat på terminalen.
+ Med en loggfil har du möjligt att se felmeddelanden som skrevs ut på
+ terminalen av programmet (stdout och stderr).
+
+ Se `Ghostscriptexempel` och `Vanliga problem`.
+3Programmet hanterar utdata
+?Programmet hanterar utdata
+ När utdata-alternativet är` Programmet hanterar utdata`, är
+ programmet till vilket omdirigering skett totalansvarigt för all
+ utdata.
+ Om programmet vill skriva till en annan skrivare måste det sköta det helt
+ självt. Om programmet inte vill generera någon utdata alls går det också
+ för sig.
+ Så här betedde sig Redmon 1.1.
+3Skicka stdout till skrivare
+?Skicka stdout till skrivare
+ När utdata-alternativet är` Skicka stdout till skrivare`, bör
+ programmet till vilket omdirigering skett skriva utdata till standard
+ output. RedMon kommer att kopiera denna utdata till angiven skrivare.
+ Standard output kommer inte att skrivas till loggfilen.
+
+ Detta alternativ bör inte användas med Ghostscript 5.50 eller tidigare.
+3Kopiera temporärfil till skrivare
+?Kopiera temporärfil till skrivare
+ När utdata-alternativet är` Kopiera temporärfil till skrivare`, bör
+ programmet till vilket omdirigering skett skriva utdata till en temporär
+ fil. RedMon kommer att skicka innehållet i denna fil till angiven skrivare.
+ Namnet på den temporära filen anges av RedMon, och kan erhållas genom att
+ placera `%1` i programmets argument. Vill du ange `%1` i programargumenten
+ och unvika att RedMon ersätter det med namnet på den temporära filen, måste
+ du använda `%%1`.
+
+ Till exempel kan programmets argument innehålla:
+  -sOutputFile="%1"
+
+ Denna metod rekommenderas för användning med Ghostscript.
+3Skicka kanal till skrivare
+?Skicka kanal till skrivare
+ När man valt utdata-alternativet` Skicka kanal till skrivare` skall det
+ program till vilket omdirigering skett skicka sina utdata till en kanal (pipe)
+ skapad av RedMon. Handtaget för kanalen kan erhållas genom att placera ett '%h'
+ någonstans bland argumenten till programmet. RedMon kommer att skicka data från denna
+ kanal vidare till skrivaren.
+
+ Till exempel kan programmets argument innehålla:
+  -sOutputFile="%%handle%%%h"
+
+ Denna metod kräver att GhostScript 5.86 eller senare används.
+3Skriv ut fel
+?Skriv ut fel
+ Om `Skriv ut fel` är valt och det program till vilket omdirigeringen sker
+ skulle avslutas i förtid, kommer RedMon att skriva ut en felrapport till
+ skrivaren. Denna kommer att innehålla det som skrivits till `Loggfil`en.
+ Om man kombinerar valen `Skriv ut fel` och `Avlusning` kommer man att
+ slösa bort en stor mängd papper.
+
+ `Skriv ut fel` är till störst nytta om det program till vilket
+ omdirigering sker genererar felmeddelanden till terminalen som
+ fångas upp i loggfilen.
+
+ `Skriv ut fel` ignoreras om man har valt `Programmet hanterar utdata`.
+3Miljövariabler
+?Miljövariabler
+ Programmet till vilket omdirigering sker kan erhålla information om
+ pågående utskriftsjobb från miljövariabler. Följande miljövariabler
+ sätts av RedMon:
+
+ `REDMON_PORT` är portnamnet, vanligtvis "RPT1:".
+
+ `REDMON_JOB` är jobbnumret, ett heltal.
+
+ `REDMON_PRINTER` är namnet på skrivaren (t.ex. "HP DeskJet 500").
+
+ `REDMON_MACHINE` är namnet på maskinen som skapade jobbet
+ (t.ex. "\\Desktop").
+
+ `REDMON_USER` är namnet på användaren som äger jobbet (t.ex. "JCITIZEN).
+
+ `REDMON_DOCNAME` är namnet på utskriftsjobbet (t.ex. "Printer Test Page").
+
+ `TEMP` och `TMP` är kataloger för temporärfiler.
+
+ Notera att under Windows NT körs programmet till vilket omdirigering
+ skett i SYSTEM-användarens miljö. Förutom de ovan angivna miljövariablerna
+ finns mycket få andra att tillgå. Registrynyckeln HKEY_USER och aktuell
+ användarprofil är de som tillhör användaren "Default User".
+3Kör som Användare
+?Kör som Användare
+ "Kör som Användare" innebär att den användare som skapade utskriftsjobbet
+ kommer att stå som ägare till den process som kör programmet till vilket
+ omdirigering skett.
+
+ "Kör som Användare" är endast tillgängligt för NT4. Använd inte denna
+ inställning om skrivaren är utdelad i ett nätverk.
+ Fjärranslutna användare kan inte köra program på din dator.
+ Om en fjärransluten användare försöket skapa ett jobb, kommer programmet
+ att misslyckas med ett meddelande likt:
+  Initialization of dynamic link library
+  C:\WINNT4\system32\kernel32.dll failed.
+  The process is terminating abnormally.
+ Tjänsten för hantering av  utskriftskön kommer att vara låst tills du stänger
+ av och startar om den.
+
+ `Kör som Användare `är tänkt för att starta ett program med grafiskt
+ användargränssnitt, t.ex. GSview, lokalt m.h.a. RedRun.
+
+ Programmet kommer visserligen att ha de rättigheter och säkerhetsinställningar
+ som gäller den användare som skapade utskriftsjobbet, men det kommer att
+ ha SYSTEM-användarens omgivning. Användarprofilen kommer inte att vara
+ den rätta.
+3Avsluta efter
+?Avsluta efter
+ Efter att ha skrivit all data till det program till vilket omdirigering
+ skett kommer `RedMon` vanligtvis att vänta upp till 300 sekunder på att
+ programmet skall bli klart innan eventuell utdata skickas till skrivaren
+ och loggfilen stängs.
+ Om programmet tar mer än 300 sekunder på sig att avsluta kan utdata från
+ programmet gå förlorade eller kapas av. Viss utdata till terminalen kanske
+ inte kommer med i loggfilen.
+ Om detta inträffar kan du behöva öka värdet på `Avsluta efter`.
+2Inställningar för loggfil
+?Inställningar för loggfil
+?Loggfil
+ Om du ber `RedMon` använda en loggfil kommer all utdata på
+ terminalen från det program till vilket omdirigering sker,
+ att skrivas till denna fil. Detta är användbart för att fånga upp
+ felmeddelande från programmet till vilket du har omdirigerat
+ standard input.
+
+ För att använda en loggfil måste du kryssa i `Använd loggfil`
+ och sedan ange ett giltigt filnamn för loggfilen.
+
+ Om du markerar `Avlusning` kommer `RedMon` att skriva extra
+ meddelanden med avlusningsinformation till loggfilen. Dessa
+ meddelanden är förmodligen endast användbara för skaparen av
+ `RedMon`. Om du vill att loggfilen endast skall innehålla
+ utdata från programmet som hanterar omdirigeringen, markera
+ INTE `Avlusning`.
+
+ Se `Ghostscriptexempel`.
+2Vad är Ghostscript?
+?Vad är Ghostscript?
+?Ghostscript
+ Ghostscript är namnet på en samling programvara som tillhandahåller:
+
+ - En tolk for språket PostScript (TM) och Adobes
+ Portable Document Format (PDF -- ibland förväxlat med Acrobat,
+ Adobes program för visning och skapande av PDF filer), och
+
+ - En samling C procedurer (Ghostscript-biblioteket) som implementerar
+ de grafik och filtreringsmöjligheter
+ (datakompression / dekompression / konversion) som förekommer som
+ grundläggande operationer i språket Postscript och i PDF.
+
+ Ghostscript finns i versioner för Microsoft Windows, IBM OS/2,
+ DEC VMS och många varianter av Unix från
+   http://www.cs.wisc.edu/~ghost/
+
+ Ghostscript är ett upphovsrättsligt skyddat verk ägt av
+ Aladdin Enterprises.
+
+ GSview är en förhandsgranskare skriven av Ghostgum Software Pty Ltd,
+ baserad på Ghostscript.  GSview hittar du på
+   http://www.cs.wisc.edu/~ghost/gsview/
+
+ Om du vill använda Ghostscript tillsammans med `RedMon` bör du
+ installera GSView och Ghostscript genom att använda
+ installationsprogrammet `setup`, som ingår i GSView.
+2Ghostscriptexempel
+?Ghostscriptexempel
+ Windows 95 och Windows NT skiljer sig något åt vid konfigurationen.
+3Ghostscriptexempel för Windows 95
+?Ghostscriptexempel för Windows 95
+ Du kan använda Ghostscript tillsammans med `RedMon` för att
+ skapa en PostScript-skrivare.
+
+ För att skriva ut till en HP DeskJet 500 skrivare vars könamn
+ är "HP DeskJet 500" skapar du först en fil med namnet,
+ c:\gstools\djet500.rsp, som innehåller följande:
+  -Ic:\gstools\gs5.50;c:\gstools\gs5.50\fonts
+  -sDEVICE=djet500
+  -dNOPAUSE
+  -dSAFER
+  -sPAPERSIZE=a4
+
+ Se Ghostscriptfilerna `Use.htm` och `Install.htm` för en
+ förklaring av de använda inställningarna.
+
+ Ta fram skrivarinställningarna för en befintlig skrivare,
+ välj fliken `Information`, och tryck sedan på knappen` Lägg till port`.
+ Välj `Annan`, `Omdirigerad port` och sedan `OK`.
+
+ {bml addport1.bmp}
+
+ `RedMon`s `Lägg till port` dialog visas nu. Acceptera defaultvärdena.
+
+ {bml addport2.bmp}
+
+ Skapa, genom att använda guiden `Lägg till skrivare`, en ny skrivare
+ av Postscript-typ.
+ En passande skrivartyp är `Apple LaserWriter II NT`.
+
+ Ta fram skrivarinställningarna för den nya PostScript-skrivaren,
+ Välj fliken `Information` och ändra sedan fältet
+ `Skriv till följande port` till den `RedMon` port du skapade,
+ förmodligen fick den namnet RPT1:
+
+ {bml property.bmp}
+
+ Välj knappen `Portinställningar`.
+ Dialogrutan `RPT1: Inställningar` visas nu.
+
+ Ange programnamnet
+  c:\gstools\gs5.50\gswin32c.exe
+ och argumenten
+  @c:\gstools\djet500.rsp -sOutputFile="%1" -
+ Se noga till att du får med blanktecknet och `bindestrecket` på
+ slutet av raden.
+ Glömmer du detta kan Ghostscript hänga skrivarkön.
+ Sätt Utdata till `Kopiera temporärfil till skrivare` och välj skrivare
+ `HP DeskJet 500`.
+
+ {bml portset1.bmp}
+
+ Om du vill se vad som skrivs till terminalen (dvs. du vill se
+ felmeddelanden), se `Loggfilsinställningar`.
+
+ {bml portset2.bmp}
+
+ Tryck på OK-knapparna för dialogrutorna `Loggfilsinställningar` och
+ `RPT1: Inställningar`.
+
+ Bland skrivarinställningarna för denna PostScript-skrivare,
+ välj fliken `Information`, tryck sedan på knappen
+ `Spooler-inställ(ningar)`.
+ Ändra `Dataformat för överföring till buffert` till `RAW`.
+ Välj `Inaktivera tvåvägsstöd för den här skrivaren`.
+ Denna sista ändring är mycket viktig.
+
+ {bml spoolset.bmp}
+
+ Bland skrivarinställningarna för denna PostScript-skrivare,
+ välj fliken `PostScript`.  Se till att `PostScript-header`
+ är `Överför headern för varje utskriftsjobb`.
+ Välj knappen `Avancerat` för att visa
+ `Avancerade PostScript-alternativ`.
+ `Dataformat` skall vara `ASCII-data`.
+ Avaktivera både `Skicka CTRL+D före jobb` och
+ `Skicka CTRL+D efter jobb`.
+
+ Genom att skriva ut på skrivaren `Apple LaserWriter II NT` kommer
+ nu Ghostscript att användas.
+ Om du delar ut denna skrivare till klienter i ett nätverk kommer
+ den att se ut som en Postscript-skrivare för dem.
+
+ För en lista med tillgängliga skrivartyper i Ghostscript gå till
+ Ghostscriptkatalogen c:\gstools\gs5.50 och kör
+  gswin32c -h
+ Om din skrivare inte finns i listan titta på sidan
+  http://www.cs.wisc.edu/~ghost/printer.html
+ och se efter om någon av de befintliga skrivartyperna i Ghostscript
+ fungerar ihop med din skrivare.
+3Ghostscriptexempel för Windows NT 4.0
+?Ghostscriptexempel för Windows NT 4.0
+ Du kan använda Ghostscript tillsammans med `RedMon` för att
+ skapa en PostScript-skrivare.
+
+ För att skriva ut till en HP DeskJet 500 skrivare vars könamn
+ är "HP DeskJet 500" skapar du först en fil med namnet,
+ c:\gstools\djet500.rsp, som innehåller följande:
+  -Ic:\gstools\gs5.50;c:\gstools\gs5.50\fonts
+  -sDEVICE=djet500
+  -dNOPAUSE
+  -dSAFER
+  -sPAPERSIZE=a4
+
+ Se Ghostscriptfilerna `Use.htm` och `Install.htm` för en
+ förklaring av de använda inställningarna.
+
+ Starta guiden `Lägg till skrivare`.
+ På den andra sidan välj `Lägg till port`.
+
+ {bml ntaddp1.bmp}
+
+ Välj `Omdirigerad port` sedan `Ny port`.
+ RedMons dialogruta `Lägg till port` visas nu.
+ Acceptera defaultvärdena.
+
+ {bml addport2.bmp}
+
+ Tryck `Stäng` sedan `Portinställningar`.
+ Dialogrutan `RPT1: Inställningar` visas nu.
+
+ Ange programnamnet
+  c:\gstools\gs5.50\gswin32c.exe
+ och argumenten
+  @c:\gstools\djet500.rsp -sOutputFile="%1" -
+ Se noga till att du får med blanktecknet och `bindestrecket` på
+ slutet av raden.
+ Glömmer du detta kan Ghostscript hänga skrivarkön.
+ Sätt Utdata till `Kopiera temporärfil till skrivare` och välj skrivare
+ `HP DeskJet 500`.
+
+ {bml portset1.bmp}
+
+ Om du vill se vad som skrivs till terminalen (dvs. du vill se
+ felmeddelanden), se `Loggfilsinställningar`.
+
+ {bml portset2.bmp}
+
+ Tryck på OK-knapparna för dialogrutorna `Loggfilsinställningar` och
+ `RPT1: Inställningar`.
+
+ Välj `Apple LaserWriter II NT v47.0` från sidan för tillverkare
+ och modell i guiden `Lägg till skrivare`.
+
+ Genom att skriva ut på skrivaren `Apple LaserWriter II NT` kommer
+ nu Ghostscript att användas.
+ Om du delar ut denna skrivare till klienter i ett nätverk kommer
+ den att se ut som en Postscript-skrivare för dem.
+
+ För en lista med tillgängliga skrivartyper i Ghostscript gå till
+ Ghostscriptkatalogen c:\gstools\gs5.50 och kör
+  gswin32c -h
+ Om din skrivare inte finns i listan titta på sidan
+  http://www.cs.wisc.edu/~ghost/printer.html
+ och se efter om någon av de befintliga skrivartyperna i Ghostscript
+ fungerar ihop med din skrivare.
+
+ Om du senare vill ändra inställningarna för den omdirigerade porten,
+ ta fram skrivarinställningarna, välj fliken `Portar`,
+ och sedan `Portinställningar`.
+ RedMon kräver att tvåvägsstöd är inaktiverat men det förefaller
+ som om det inte ens kan aktiveras.
+
+ {bml ntprop.bmp}
+3Ghostscriptexempel med HP LaserJet skrivare
+?Ghostscriptexempel med HP LaserJet skrivare
+?LaserJet
+ För skrivaren HP LaserJet 4L, behöver du använda Ghostscriptenheten
+ ljet4 med upplösningen satt till 300dpi.
+ c:\gstools\ljet4l.rsp, innehålla:
+  -Ic:\gstools\gs5.50;c:\gstools\gs5.50\fonts
+  -sDEVICE=ljet4
+  -r300
+  -dNOPAUSE
+  -dSAFER
+  -sPAPERSIZE=a4
+
+ Ghostscriptkommandot skulle vara
+  c:\gstools\gs5.50\gswin32c.exe
+ och argumenten
+  @c:\gstools\ljet4l.rsp -sOutputFile="%1" -
+ Kontrollera noga att du tar med blanktecknet och `bindestrecket`
+ på slutet av raden.
+ Glömmer du det kan det få Ghostscript att hänga skrivarkön.
+ Utdata skall vara
+  Kopiera temporärfil till skrivare
+ och skrivare
+  HP LaserJet 4L
+
+ Alla andra inställningar skall vara desamma som i föregående exempel.
+2Vanliga problem
+?Vanliga problem
+ Om problem skulle uppstå är det rekommendabelt att ställa in
+ RedMon porten så att den använder en loggfil med avlusning påslaget.
+
+ `Problem:` När du försöker skriva ut visas en informationsruta med
+ titeln `Mappen Skrivare` och texten `Ett fel uppstod vid skrivning
+ till RPT1: för skrivare (Apple LaserWriter II NT): Det går inte att
+ skriva till angiven enhet.`
+
+ RedMon kunde inte starta det program du angivet.
+ Se efter i Loggfilen för fler detaljer.
+
+ `Problem:` Ghostscript hänger sig.
+
+ Du kan ha glömt att lägga till ett blanktecken och ett bindestreck
+ på slutet av argumenten till Ghostscript. Detta krävs för att få
+ Ghostscript att läsa från terminalen.
+
+ `Problem:` Ghostscript bearbetar vissa utskrifter, men inte andra.
+ Om du skriver ut till FILE:, så kan Ghostscript bearbeta dessa
+ utskrifter.
+
+ Försäkra dig om att `Spooler-inställ(ningar)` är satta till
+ `Inaktivera tvåvägsstöd för den här skrivaren`.
+ Om detta är problemet kommer det, om man har avlusning påslaget, att
+ i loggfilen stå
+  REDMON ReadPort: Du måste inaktivera tvåvägsstöd för den här skrivaren.
+2Copyright
+?Copyright
+  Copyright (C) 1997-1999, Ghostgum Software Pty Ltd.  All rights reserved.
+
+ Denna fil är en del av RedMon.
+
+ Detta program distribueras UTAN NÅGRA SOM HELST GARANTIER. Ingen
+ tillverkare eller distributör tar något som helst ansvar för vad
+ som kan hända vid användning eller för att programmet har något
+ speciellt syfte eller ens fungerar överhuvudtaget, om inte han
+ eller hon säger så skriftligt. Se RedMon Free Public Licence
+ ("Licensen") för fullständig information.
+
+ Varje kopia av RedMon måste innehålla en kopia av Licensen, normalt
+ i en ren ASCII-textfil vid namn LICENCE.  Licensen ger dig rättigheter
+ att kopiera, modifiera och vidaredistribuera RedMon, men endast under
+ vissa villkor beskrivna i Licensen. Bland annat kräver Licensen att
+ copyrightinformationen och den här texten måste bevaras intakt i alla
+ kopior.
+
+   Författare: Russell Lang, Ghostgum Software Pty Ltd
+     Internet: http://www.cs.wisc.edu/~ghost/rjl.html

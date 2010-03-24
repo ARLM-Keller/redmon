@@ -1,0 +1,7 @@
+[OPTIONS]
+TITLE=RedMon - Durckeranschluﬂ-Umleitungsmonitor
+BMROOT=binary
+[FILES]
+redmon.rtf
+[CONFIG]
+BrowseButtons()

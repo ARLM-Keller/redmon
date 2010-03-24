@@ -1,0 +1,7 @@
+LIBRARY		REDMON95
+DESCRIPTION	'Redirected Port Monitor for Windows 95'
+DATA		MULTIPLE SHARED 
+EXPORTS	
+		DllEntryPoint
+		DllMain
+		InitializeMonitorEx
