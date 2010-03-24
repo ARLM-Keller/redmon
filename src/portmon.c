@@ -183,7 +183,11 @@ show_help(HWND hwnd, int id)
     LoadString(hdll, id, buf, sizeof(buf)/sizeof(TCHAR) - 1);
 
     /* show help */
+#if defined(_WIN64) || defined(GWLP_USERDATA)
+    WinHelp(hwnd, helpfile, HELP_KEY, (ULONG_PTR)buf);
+#else
     WinHelp(hwnd, helpfile, HELP_KEY, (DWORD)buf);
+#endif
 }
 
 LONG

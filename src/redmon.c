@@ -163,9 +163,9 @@ void redmon_cancel_job(REDATA *prd);
 BOOL start_redirect(REDATA * prd);
 void reset_redata(REDATA *prd);
 BOOL check_process(REDATA *prd);
-UINT APIENTRY GetSaveHookProc(HWND hDlg, UINT message, 
+LRESULT APIENTRY GetSaveHookProc(HWND hDlg, UINT message, 
 	WPARAM wParam, LPARAM lParam);
-BOOL CALLBACK LogfileDlgProc(HWND hDlg, UINT message, 
+LRESULT CALLBACK LogfileDlgProc(HWND hDlg, UINT message, 
 	WPARAM wParam, LPARAM lParam);
 int create_tempfile(LPTSTR filename, DWORD len);
 int redmon_printfile(REDATA * prd, TCHAR *filename);
@@ -1447,7 +1447,11 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
 	{
 	    /* copy printer pipe handle as hexadecimal */
 	    prd->command[i] = '\0';
-	    wsprintf(&(prd->command[i]), TEXT("%08x"), (int)(prd->hPipeWr));
+#ifdef _WIN64
+	    wsprintf(&(prd->command[i]), TEXT("%08x%08x"), (DWORD)(((DWORD_PTR)prd->hPipeWr)>>32), (DWORD)((DWORD_PTR)prd->hPipeWr));
+#else
+	    wsprintf(&(prd->command[i]), TEXT("%08x"), (DWORD)(prd->hPipeWr));
+#endif
 	    i = lstrlen(prd->command);
 	    s++;
         }
@@ -2075,7 +2079,7 @@ redmon_set_port_timeouts(REDATA *prd, LPCOMMTIMEOUTS lpCTO, DWORD reserved)
  
 
 
-UINT APIENTRY 
+LRESULT APIENTRY 
 GetSaveHookProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     if (message == WM_INITDIALOG) {
@@ -2650,15 +2654,23 @@ redmon_print_error(REDATA *prd)
 
 
 /* Add Port dialog box */
-BOOL CALLBACK 
+LRESULT CALLBACK 
 AddDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
+#if defined(_WIN64) || defined(GWLP_USERDATA)
+    RECONFIG *pconfig = (RECONFIG *)GetWindowLongPtr(hDlg, GWLP_USERDATA);
+#else
     RECONFIG *pconfig = (RECONFIG *)GetWindowLong(hDlg, GWL_USERDATA);
+#endif
     switch(message) {
         case WM_INITDIALOG:
 	    /* save pointer to port name */
 	    pconfig = (RECONFIG *)lParam;
+#if defined(_WIN64) || defined(GWLP_USERDATA)
+	    SetWindowLongPtr(hDlg, GWLP_USERDATA, (LONG_PTR)lParam);
+#else
 	    SetWindowLong(hDlg, GWL_USERDATA, (LONG)lParam);
+#endif
 	    SetDlgItemText(hDlg, IDC_PORTNAME, pconfig->szPortName);
 	    SetForegroundWindow(hDlg);
             return( TRUE);
@@ -2686,7 +2698,7 @@ AddDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 }
 
 /* Log file dialog box */
-BOOL CALLBACK 
+LRESULT CALLBACK 
 LogfileDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch(message) {
@@ -2697,7 +2709,12 @@ LogfileDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	    TCHAR str[MAXSTR];
 
 	    /* save pointer to configuration data */
+#if defined(_WIN64) || defined(GWLP_USERDATA)
+	    SetWindowLongPtr(hDlg, GWLP_USERDATA, (LONG_PTR)lParam);
+#else
 	    SetWindowLong(hDlg, GWL_USERDATA, (LONG)lParam);
+#endif
+
 	    config = (RECONFIG *)lParam;
 
 	    SetDlgItemText(hDlg, IDC_LOGNAME, config->szLogFileName);
@@ -2747,8 +2764,13 @@ LogfileDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 /* should we fall through to IDOK */
 	      case IDOK:
 		{
+#if defined(_WIN64) || defined(GWLP_USERDATA)
+		    RECONFIG *config = 
+			    (RECONFIG *)GetWindowLongPtr(hDlg, GWLP_USERDATA);
+#else
 		    RECONFIG *config = 
 			    (RECONFIG *)GetWindowLong(hDlg, GWL_USERDATA);
+#endif
 		    config->dwLogFileUse = (BOOL)SendDlgItemMessage(hDlg, 
 			IDC_LOGUSE, BM_GETCHECK, 0, 0);
 		    if (config->dwLogFileUse) {
@@ -2824,7 +2846,7 @@ BOOL fail = FALSE;
 
 
 /* Configure Port dialog box */
-BOOL CALLBACK 
+LRESULT CALLBACK 
 ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch(message) {
@@ -2845,7 +2867,11 @@ ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	    int i;
 
 	    /* save pointer to configuration data */
+#if defined(_WIN64) || defined(GWLP_USERDATA)
+	    SetWindowLongPtr(hDlg, GWLP_USERDATA, (LONG_PTR)lParam);
+#else
 	    SetWindowLong(hDlg, GWL_USERDATA, (LONG)lParam);
+#endif
 	    config = (RECONFIG *)lParam;
 
 	    SetDlgItemText(hDlg, IDC_COMMAND, config->szCommand);
@@ -2921,7 +2947,11 @@ ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	      case IDC_LOGFILE:
 		  DialogBoxParam(hdll, MAKEINTRESOURCE(IDD_CONFIGLOG), hDlg, 
 			LogfileDlgProc, 
+#if defined(_WIN64) || defined(GWLP_USERDATA)
+			(LPARAM)GetWindowLongPtr(hDlg, GWLP_USERDATA));
+#else
 			(LPARAM)GetWindowLong(hDlg, GWL_USERDATA));
+#endif
                   return(TRUE);
 	      case IDC_OUTPUT:
 		  if (HIWORD(wParam) == CBN_SELCHANGE)  {
@@ -2941,8 +2971,15 @@ ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	      case IDOK:
 		{
 		    BOOL success;
+#if defined(_WIN64) || defined(GWLP_USERDATA)
+		    RECONFIG *config = 
+			    (RECONFIG *)GetWindowLongPtr(hDlg, GWLP_USERDATA);
+#else
 		    RECONFIG *config = 
 			    (RECONFIG *)GetWindowLong(hDlg, GWL_USERDATA);
+#endif
+
+
 		    GetDlgItemText(hDlg, IDC_COMMAND, config->szCommand, 
 			sizeof(config->szCommand)/sizeof(TCHAR) - 1);
 		    GetDlgItemText(hDlg, IDC_ARGS, config->szArguments, 

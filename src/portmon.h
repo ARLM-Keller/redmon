@@ -81,9 +81,9 @@ LPTSTR redmon_init_config(RECONFIG *config);
 
 /* Add Port and Configure Port dialogs */
 /* WM_INITDIALOG lParam is a pointer to RECONFIG */
-BOOL CALLBACK AddDlgProc(HWND hDlg, UINT message, 
+LRESULT CALLBACK AddDlgProc(HWND hDlg, UINT message, 
         WPARAM wParam, LPARAM lParam);
-BOOL CALLBACK ConfigDlgProc(HWND hDlg, UINT message, 
+LRESULT CALLBACK ConfigDlgProc(HWND hDlg, UINT message, 
 	WPARAM wParam, LPARAM lParam);
 
 BOOL redmon_suggest_portname(TCHAR *portname, int len, int nAttempt);
@@ -262,6 +262,9 @@ LPMONITOREX WINAPI _export InitializePrintMonitor(LPWSTR pRegistryRoot);
 
 #ifdef NT50
 /* Windows 2000 (NT5) structures and functions */
+
+/* if BIDI_ACTION_ENUM_SCHEMA, we have included a winspool.h with NT5 define */
+#ifndef BIDI_ACTION_ENUM_SCHEMA
 typedef struct _BINARY_CONTAINER {
   DWORD  cbBuf;
   LPBYTE  pData;
@@ -303,7 +306,7 @@ typedef struct _BIDI_RESPONSE_CONTAINER {
   DWORD  Count;
   BIDI_RESPONSE_DATA aData[1];
 } BIDI_RESPONSE_CONTAINER, *PBIDI_RESPONSE_CONTAINER, *LPBIDI_RESPONSE_CONTAINER; 
-
+#endif
 /* MONITOR2 structure is returned by InitializePrintMonitor2 */
 typedef struct _MONITOR2 
 { 

@@ -23,13 +23,18 @@ LANGUAGE=en
 
 # VISUALC=0 for Borland C++ 4.5
 # VISUALC=5 for MS Visual C++ 5.0
-# VISUALC=6 for MS Visual C++ 5.0
-VISUALC=5
+# VISUALC=6 for MS Visual C++ 6.0
+# VISUALC=8 for MS Visual C++ 8.0 (Visual Studio 2005)
+VISUALC=8
+
+# put TARGETX64
+TARGETX64=1
+TARGETIA64=0
 
 # Edit DEVBASE as required
 !if $(VISUALC)
 #DEVBASE=f:\Program Files\Microsoft Visual Studio
-DEVBASE=c:\devstudio
+DEVBASE=c:\Microsoft Visual Studio 8
 !else
 DEVBASE=c:\bc45
 !endif
@@ -41,6 +46,39 @@ DEBUG=1
 
 !if $(VISUALC)
 # Microsoft Visual C++ 5.0
+!if $(VISUALC) > 6
+COMPBASE = $(DEVBASE)\vc
+RCOMP="$(DEVBASE)\vc\bin\rc"
+!if $(TARGETX64)
+LIBDIR=$(COMPBASE)\PlatformSDK\Lib\AMD64
+COMPDIR=$(COMPBASE)\bin\x86_amd64
+!else
+!if $(TARGETIA64)
+LIBDIR=$(COMPBASE)\PlatformSDK\Lib\IA64
+COMPDIR=$(COMPBASE)\bin\x86_ia64
+!else
+LIBDIR=$(COMPBASE)\PlatformSDK\Lib
+COMPDIR=$(COMPBASE)\bin
+!endif
+!endif
+INCDIR=$(COMPBASE)\include
+LIBPRE=
+LIBPOST=@lib2.rsp
+LIBDEP=lib.rsp lib2.rsp
+CCC=cl
+EXEFLAG=
+DLLFLAG=/LD
+OBJNAME=/Fo
+!if $(DEBUG)
+CDEBUG=/Zi -DDEBUG /Wp64 -D_CRT_SECURE_NO_DEPRECATE
+DEBUGLNK=/DEBUG
+!else
+CDEBUG=/O1 /Wp64 -D_CRT_SECURE_NO_DEPRECATE
+DEBUGLNK=
+!endif
+RLINK=$(RCOMP)
+HC=hcw /C /E
+!else
 !if $(VISUALC) <= 5
 COMPBASE = $(DEVBASE)\vc
 RCOMP="$(DEVBASE)\sharedide\bin\rc"
@@ -67,6 +105,7 @@ DEBUGLNK=
 !endif
 RLINK=$(RCOMP)
 HC=hcw /C /E
+!endif
 !else
 COMPBASE=$(DEVBASE)
 COMPDIR=$(COMPBASE)\bin
@@ -88,9 +127,21 @@ HC=$(COMPDIR)\hc31
 
 CC="$(COMPDIR)\$(CCC)" $(CDEBUG) -I"$(INCDIR)"
 
+!if $(TARGETX64) >= 1
+all:	redmonnt.dll \
+    setup.exe unredmon.exe\
+    redpr.exe redrun.exe redfile.exe enum.exe
+!else
+!if $(TARGETIA64) >= 1
+all:	redmonnt.dll \
+    setup.exe unredmon.exe\
+    redpr.exe redrun.exe redfile.exe enum.exe
+!else
 all:	redmon95.dll redmonnt.dll redmon35.dll \
     redmon.hlp setup.exe unredmon.exe\
     redpr.exe redrun.exe redfile.exe enum.exe
+!endif
+!endif
 
 .c.obj:
 	$(CC) -c $*.c

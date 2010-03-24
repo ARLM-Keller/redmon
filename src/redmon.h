@@ -27,7 +27,20 @@
 #define MONITORDLL35 TEXT("redmon35.dll")
 #define MONITORDLLNT TEXT("redmonnt.dll")
 #define MONITORENV95 TEXT("Windows 4.0")
+#ifdef _WIN64
+  #ifdef _M_AMD64
+  //#define MONITORENVNT TEXT("Windows NT x64")
+  #define MONITORENVNT TEXT("Windows x64")
+  #else
+  #ifdef _M_IA64
+  #define MONITORENVNT TEXT("Windows IA64")
+  #else
+  #error (unknown target)
+  #endif
+  #endif
+#else
 #define MONITORENVNT TEXT("Windows NT x86")
+#endif
 #define MONITORHLP TEXT("redmon.hlp")
 #define MONITORKEY TEXT("Redirection Port Monitor")
 
