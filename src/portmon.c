@@ -13,6 +13,8 @@
   to copy, modify and redistribute RedMon, but only under certain conditions 
   described in the Licence.  Among other things, the Licence requires that 
   the copyright notice and this notice be preserved on all copies.
+
+  Modified in 2010 by Jonas Oberschweiber.
 */
 
 /* portmon.c */
@@ -102,11 +104,11 @@ syslog(LPCTSTR buf)
 #endif
     DWORD cbWritten;
     HANDLE hfile;
-    if (buf == NULL)
+    /*if (buf == NULL)
 	buf = TEXT("(null)");
 
     if ((hfile = CreateFileA("c:\\redmon.log", GENERIC_WRITE, 
-	0 /* no file sharing */, NULL, OPEN_ALWAYS, 0, NULL)) 
+	0 /* no file sharing , NULL, OPEN_ALWAYS, 0, NULL)) 
 		!= INVALID_HANDLE_VALUE) {
 	SetFilePointer(hfile, 0, NULL, FILE_END);
 #ifdef UNICODE
@@ -120,8 +122,9 @@ syslog(LPCTSTR buf)
 #else
 	WriteFile(hfile, buf, lstrlen(buf), &cbWritten, NULL);
 #endif
-	CloseHandle(hfile);
-    }
+	CloseHandle(hfile);*/        
+    OutputDebugString(buf);
+    //}
 }
 
 void
@@ -1855,11 +1858,63 @@ InitializePrintMonitor2(PMONITORINIT pMonitorInit, PHANDLE phMonitor)
     return &mon2;
 } 
 
+// The following are wrappers that start an elevated redconf.exe.
+
+BOOL WINAPI rcAddPortUIOuter(PCWSTR pszServer, HWND hWnd, 
+	PCWSTR pszPortNameIn, PWSTR *ppszPortNameOut)
+{
+    SHELLEXECUTEINFOA tempInfo;
+    tempInfo.cbSize = sizeof(SHELLEXECUTEINFOA);
+    tempInfo.fMask = 0;
+    tempInfo.hwnd = NULL;
+    tempInfo.lpVerb = "runas";
+    tempInfo.lpFile = "redconf.exe";
+    tempInfo.lpParameters = "1Redirected Port";
+    tempInfo.lpDirectory = "C:\\";
+    tempInfo.nShow = SW_NORMAL;
+    ShellExecuteExA(&tempInfo);
+}
+
+BOOL WINAPI ShowExternalUIWithPortName(PCWSTR pszServer, HWND hWnd, 
+                                        PCWSTR pszPortNameIn, char cmd)
+{
+    SHELLEXECUTEINFOA tempInfo;
+    int len = wcslen(pszPortNameIn), i;
+    char *args = (char *)malloc(sizeof(char) * (wcslen(pszPortNameIn) + 3));
+    args[0] = cmd;
+    for (i = 0; i < len; i++) {
+        args[i + 1] = (char)pszPortNameIn[i];
+    }
+    args[len] = ':';
+    args[len + 1] = '\0';
+    tempInfo.cbSize = sizeof(SHELLEXECUTEINFOA);
+    tempInfo.fMask = 0;
+    tempInfo.hwnd = NULL;
+    tempInfo.lpVerb = "runas";
+    tempInfo.lpFile = "redconf.exe";
+    tempInfo.lpParameters = args;
+    tempInfo.lpDirectory = "C:\\";
+    tempInfo.nShow = SW_NORMAL;
+    ShellExecuteExA(&tempInfo);
+}
+
+BOOL WINAPI rcConfigurePortUIOuter(PCWSTR pszServer, HWND hWnd,
+                                   PCWSTR pszPortNameIn)
+{
+    ShowExternalUIWithPortName(pszServer, hWnd, pszPortNameIn, '2');
+}
+
+BOOL WINAPI rcDeletePortUIOuter(PCWSTR pszServer, HWND hWnd,
+                                PCWSTR pszPortNameIn)
+{
+    ShowExternalUIWithPortName(pszServer, hWnd, pszPortNameIn, '3');
+}
+
 MONITORUI mui = {
     sizeof(MONITORUI),
-    rcAddPortUI,
-    rcConfigurePortUI,
-    rcDeletePortUI
+    rcAddPortUIOuter,
+    rcConfigurePortUIOuter,
+    rcDeletePortUIOuter
 };
 
 PMONITORUI WINAPI 

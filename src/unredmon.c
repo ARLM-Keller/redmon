@@ -13,6 +13,8 @@
   to copy, modify and redistribute RedMon, but only under certain conditions 
   described in the Licence.  Among other things, the Licence requires that 
   the copyright notice and this notice be preserved on all copies.
+  
+  Modified in 2010 by Jonas Oberschweiber
 */
 
 /* RedMon uninstall program */
@@ -143,6 +145,11 @@ DWORD version = GetVersion();
    lstrcat(buffer, MONITORHLP);
    if (!DeleteFile(buffer))
 	return message(IDS_ERROR_DELETE_HELP);
+   lstrcpy(buffer, sysdir);
+   lstrcat(buffer, "\\");
+   lstrcat(buffer, REDCONF);
+   if (!DeleteFile(buffer))
+       return message(IDS_ERROR_DELETE_REDCONF);
 
    /* delete registry entries for uninstall */
    if ((rc = RegOpenKeyEx(HKEY_LOCAL_MACHINE, UNINSTALLKEY, 0, 

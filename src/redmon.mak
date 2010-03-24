@@ -16,6 +16,7 @@
 
 #
 # File modified by Gilles Vollant (2005) for AMD64 and IA64 support
+# And modified again by Jonas Oberschweiber (2010) for VS 2008 and Win 7 support
 
 
 
@@ -33,19 +34,21 @@ LANGUAGE=en
 VISUALC=8
 
 # put TARGETX64
-TARGETX64=1
+TARGETX64=0
 TARGETIA64=0
 
 # Edit DEVBASE as required
 !if $(VISUALC)
 #DEVBASE=f:\Program Files\Microsoft Visual Studio
-DEVBASE=c:\Microsoft Visual Studio 8
+DEVBASE=c:\Program Files (x86)\Microsoft Visual Studio 9.0
 !else
 DEVBASE=c:\bc45
 !endif
 
+SDKPATH=C:\Program Files\Microsoft SDKs\Windows\v6.0A
+
 # DEBUG=1 for debugging
-DEBUG=0
+DEBUG=1
 
 # Shouldn't need editing below here
 
@@ -53,25 +56,27 @@ DEBUG=0
 # Microsoft Visual C++ 5.0
 !if $(VISUALC) > 6
 COMPBASE = $(DEVBASE)\vc
-RCOMP="$(DEVBASE)\vc\bin\rc"
+RCOMP="$(SDKPATH)\Bin\rc.exe"
 !if $(TARGETX64)
-LIBDIR=$(COMPBASE)\PlatformSDK\Lib\AMD64
+LIBDIR=$(SDKPATH)\Lib\x64
 COMPDIR=$(COMPBASE)\bin\x86_amd64
+LNKOPTS=/LIBPATH:"$(COMPBASE)\Lib\amd64" /LIBPATH:"$(SDKPATH)\Lib\x64"
 !else
 !if $(TARGETIA64)
 LIBDIR=$(COMPBASE)\PlatformSDK\Lib\IA64
 COMPDIR=$(COMPBASE)\bin\x86_ia64
-!else
-LIBDIR=$(COMPBASE)\PlatformSDK\Lib
+!else # x86
+LIBDIR=$(SDKPATH)\Lib
 COMPDIR=$(COMPBASE)\bin
-!endif
-!endif
+LNKOPTS=/LIBPATH:"$(COMPBASE)\Lib"  /LIBPATH:"$(SDKPATH)\Lib"
+!endif # end TARGETIA64
+!endif # end TARGETX64
 INCDIR=$(COMPBASE)\include
 LIBPRE=
 LIBPOST=@lib2.rsp
 LIBDEP=lib.rsp lib2.rsp
 CCC=cl
-EXEFLAG=
+EXEFLAG=/MT
 DLLFLAG=/LD
 OBJNAME=/Fo
 !if $(DEBUG)
@@ -80,17 +85,17 @@ DEBUGLNK=/DEBUG
 !else
 CDEBUG=/O1 /Wp64 -D_CRT_SECURE_NO_DEPRECATE
 DEBUGLNK=
-!endif
+!endif # end DEBUG
 RLINK=$(RCOMP)
 HC=hcw /C /E
-!else
+!else # end VISUALC > 6
 !if $(VISUALC) <= 5
 COMPBASE = $(DEVBASE)\vc
 RCOMP="$(DEVBASE)\sharedide\bin\rc"
 !else
 COMPBASE = $(DEVBASE)\vc98
 RCOMP="$(DEVBASE)\common\msdev98\bin\rc"
-!endif
+!endif # end VISUALC <= 5
 COMPDIR=$(COMPBASE)\bin
 INCDIR=$(COMPBASE)\include
 LIBDIR=$(COMPBASE)\lib
@@ -135,16 +140,16 @@ CC="$(COMPDIR)\$(CCC)" $(CDEBUG) -I"$(INCDIR)"
 !if $(TARGETX64) >= 1
 all:	redmonnt.dll \
     setup.exe unredmon.exe\
-    redpr.exe redrun.exe redfile.exe enum.exe
+    redpr.exe redrun.exe redfile.exe enum.exe redconf.exe
 !else
 !if $(TARGETIA64) >= 1
 all:	redmonnt.dll \
     setup.exe unredmon.exe\
     redpr.exe redrun.exe redfile.exe enum.exe
 !else
-all:	redmon95.dll redmonnt.dll redmon35.dll \
-    redmon.hlp setup.exe unredmon.exe\
-    redpr.exe redrun.exe redfile.exe enum.exe
+all:	redmonnt.dll \
+    setup.exe unredmon.exe\
+    redpr.exe redrun.exe redfile.exe enum.exe redconf.exe
 !endif
 !endif
 
@@ -170,6 +175,7 @@ lib.rsp: redmon.mak
 	echo "$(LIBDIR)\user32.lib" >> lib.rsp
 	echo "$(LIBDIR)\winspool.lib" >> lib.rsp
 	echo "$(LIBDIR)\advapi32.lib" >> lib.rsp
+    echo "$(LIBDIR)\shell32.lib" >> lib.rsp
 
 lib2.rsp: redmon.mak
 	echo /link > lib2.rsp
@@ -182,7 +188,7 @@ lib2.rsp: redmon.mak
 setup.exe: setup.c setup.h redmon.h redmonrc.h setup.res $(LIBDEP)
 !if $(VISUALC)
 	$(CC) -c $(EXEFLAG) setup.c
-	"$(COMPDIR)\link" $(DEBUGLNK) /DEF:setup.def /OUT:setup.exe setup.obj @lib.rsp setup.res
+	"$(COMPDIR)\link" $(DEBUGLNK) $(LNKOPTS) /DEF:setup.def /OUT:setup.exe setup.obj @lib.rsp setup.res
 !else
 	$(CC) $(EXEFLAG) $(LIBPRE) setup.c
 	$(RLINK) setup.res setup.exe
@@ -191,7 +197,7 @@ setup.exe: setup.c setup.h redmon.h redmonrc.h setup.res $(LIBDEP)
 unredmon.exe: unredmon.c unredmon.res unredmon.h redmon.h redmonrc.h $(LIBDEP)
 !if $(VISUALC)
 	$(CC) -c $(EXEFLAG) unredmon.c
-	"$(COMPDIR)\link" $(DEBUGLNK) /DEF:unredmon.def /OUT:unredmon.exe unredmon.obj @lib.rsp unredmon.res
+	"$(COMPDIR)\link" $(DEBUGLNK) $(LNKOPTS) /DEF:unredmon.def /OUT:unredmon.exe unredmon.obj @lib.rsp unredmon.res
 !else
 	$(CC) $(EXEFLAG) -L$(LIBDIR) unredmon.c
 	$(RLINK) unredmon.res unredmon.exe
@@ -233,18 +239,26 @@ redmon95.dll: redmon95.obj port95.obj redmon.res $(LIBDEP)
 # NT 4/5 DLL
 redmonnt.obj: redmon.c portmon.h redmon.h redmonrc.h
 	$(CC) -c $(DLLFLAG) -DUNICODE -DNT50 -DNT40 $(OBJNAME)redmonnt.obj redmon.c
-
+                 
 portnt.obj: portmon.c portmon.h redmon.h redmonrc.h
 	$(CC) -c $(DLLFLAG) -DUNICODE -DNT50 -DNT40 $(OBJNAME)portnt.obj portmon.c
 
 redmonnt.dll: redmonnt.obj portnt.obj redmon.res $(LIBDEP) redmonnt.def
 !if $(VISUALC)
-	"$(COMPDIR)\link" $(DEBUGLNK) /DLL /DEF:redmonnt.def /OUT:redmonnt.dll redmonnt.obj portnt.obj @lib.rsp redmon.res
+	"$(COMPDIR)\link" $(DEBUGLNK) $(LNKOPTS) /DLL /DEF:redmonnt.def /OUT:redmonnt.dll portnt.obj redmonnt.obj @lib.rsp redmon.res
 !else
 	$(CC) $(DLLFLAG) -L$(LIBDIR) -eredmonnt.dll redmonnt.obj
 	$(RLINK) redmon.res redmonnt.dll
 !endif
 
+redconf.exe: redconf.c portnt.obj $(LIBDEP)
+!if $(VISUALC)
+	$(CC) -c $(EXEFLAG) $(OBJNAME)redconf.obj redconf.c
+	"$(COMPDIR)\link" $(DEBUGLNK) $(LNKOPTS) /OUT:redconf.exe portnt.obj redmonnt.obj redconf.obj @lib.rsp redmon.res
+!else
+	$(CC) $(EXEFLAG) $(LIBPRE) setup.c
+	$(RLINK) setup.res setup.exe
+!endif
 
 # NT 3.5 DLL
 redmon35.obj: redmon.c portmon.h redmon.h redmonrc.h
@@ -264,26 +278,26 @@ redmon35.dll: redmon35.obj port35.obj redmon.res $(LIBDEP) redmon35.def
 
 # RED PRint
 redpr.exe: redpr.c $(LIBDEP)
-	$(CC) $(LIBPRE) redpr.c $(LIBPOST) 
+	$(CC) $(LIBPRE) redpr.c $(LIBPOST) /link $(LNKOPTS)
 
 # REDirect and RUN
 redrun.exe: redrun.c $(LIBDEP)
-	$(CC) $(LIBPRE) redrun.c $(LIBPOST) 
+	$(CC) $(LIBPRE) redrun.c $(LIBPOST) /link $(LNKOPTS)
 
 # REDirect to FILE lib2.rsp
 redfile.exe: redfile.c $(LIBDEP)
-	$(CC) $(LIBPRE) redfile.c $(LIBPOST) 
+	$(CC) $(LIBPRE) redfile.c $(LIBPOST) /link $(LNKOPTS)
 
 # testing only
 enum.exe: enum.c $(LIBDEP)
-	$(CC) $(LIBPRE) enum.c $(LIBPOST) 
+	$(CC) $(LIBPRE) enum.c $(LIBPOST) /link $(LNKOPTS)
 
 redmon2.obj: redmon.c redmon.h redmonrc.h
 	$(CC) -c $(EXEFLAG) -DMAKEEXE $(OBJNAME)redmon2.obj redmon.c
 
 mon2.exe: redmon2.obj redmon.res $(LIBDEP)
 !if $(VISUALC)
-	"$(COMPDIR)\link" $(DEBUGLNK) /OUT:mon2.exe redmon2.obj @lib.rsp redmon.res
+	"$(COMPDIR)\link" $(DEBUGLNK) $(LNKOPTS) /OUT:mon2.exe redmon2.obj @lib.rsp redmon.res
 !else
 	$(CC) $(EXEFLAG) $(LIBPRE) -emon2.exe redmon2.obj $(LIBPOST) 
 	$(RLINK) redmon.res mon2.exe
@@ -420,6 +434,10 @@ clean:	cleanlanguage
 	-del lib2.rsp
 	-del vc50.pdb
 	-del vc60.pdb
+    -del oopregistrysrv.pdb
+    -del oopregistrysrv.ilk
+    -del oopregistrysrv.obj
+    -del oopregistrysrv.exe
 
 veryclean: clean
 	-del redmon35.dll

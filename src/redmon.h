@@ -49,4 +49,6 @@
 #define UNINSTALLSTRINGKEY TEXT("UninstallString")
 #define DISPLAYNAMEKEY TEXT("DisplayName")
 
+#define REDCONF TEXT("redconf.exe")
+
 /* end of redmon.h */
