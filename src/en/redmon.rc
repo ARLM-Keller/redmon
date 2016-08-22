@@ -1,20 +1,17 @@
-/* Copyright (C) 1997-2000, Ghostgum Software Pty Ltd.  All rights reserved.
+/* Copyright (C) 1997-2012, Ghostgum Software Pty Ltd.  All rights reserved.
   
   This file is part of RedMon.
   
-  This program is distributed with NO WARRANTY OF ANY KIND.  No author
-  or distributor accepts any responsibility for the consequences of using it,
-  or for whether it serves any particular purpose or works at all, unless he
-  or she says so in writing.  Refer to the RedMon Free Public Licence 
-  (the "Licence") for full details.
-  
-  Every copy of RedMon must include a copy of the Licence, normally in a 
-  plain ASCII text file named LICENCE.  The Licence grants you the right 
-  to copy, modify and redistribute RedMon, but only under certain conditions 
-  described in the Licence.  Among other things, the Licence requires that 
-  the copyright notice and this notice be preserved on all copies.
-*/
+  This software is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 
+  This software is distributed under licence and may not be copied, modified
+  or distributed except as expressly authorised under the terms of the
+  LICENCE.
+
+*/
+  
 /* redmon.rc */
 
 #include <windows.h>
@@ -34,7 +31,7 @@ BEGIN
 	IDS_CONFIGPROP, "%s Properties" 
 	IDS_CONFIGLOGFILE, "%s Log File Properties" 
 	IDS_CONFIGUNKNOWN, "Unknown Port Properties"
-	IDS_HELPFILE, "redmon.hlp"
+	IDS_HELPFILE, "redmon.chm"
 
 	/* These help strings must match the help file topic names */
 	IDS_HELPADD, "Add Port"
@@ -71,7 +68,7 @@ FONT 8, "MS Sans Serif"
  PUSHBUTTON "Help", IDC_HELPBUTTON, 134, 52, 44, 14
 }
 
-IDD_CONFIGPORT DIALOG 48, 32, 290, 195
+IDD_CONFIGPORT DIALOG 48, 32, 290, 215
 STYLE DS_MODALFRAME | 0x4L | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Configure Redirected Port"
 FONT 8, "MS Sans Serif"
@@ -79,22 +76,22 @@ FONT 8, "MS Sans Serif"
  LTEXT "Redirect this port to the program:", -1, 8, 6, 180, 10
  EDITTEXT IDC_COMMAND, 6, 18, 200, 12, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP | WS_CHILD
  LTEXT "Arguments for this program are:", -1, 8, 40, 180, 10
- EDITTEXT IDC_ARGS, 6, 52, 200, 12, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP | WS_CHILD
- LTEXT "Output:", -1, 8, 83, 36, 8
- COMBOBOX IDC_OUTPUT, 46, 80, 160, 54, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
- LTEXT "Printer:", IDC_PRINTERTEXT, 8, 103, 37, 10
- COMBOBOX IDC_PRINTER, 46, 100, 160, 64, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
- AUTOCHECKBOX "Print Errors", IDC_PRINTERROR, 218, 101, 72, 12, BS_AUTOCHECKBOX | WS_TABSTOP
- LTEXT "Run:", -1, 8, 123, 36, 8
- COMBOBOX IDC_SHOW, 45, 120, 100, 44, CBS_DROPDOWNLIST | WS_TABSTOP
- CHECKBOX "Run as User", IDC_RUNUSER, 163, 121, 110, 12, BS_AUTOCHECKBOX | WS_TABSTOP
- LTEXT "Shut down delay:", -1, 8, 143, 72, 8
- EDITTEXT IDC_DELAY, 83, 141, 24, 12
- LTEXT "seconds", -1, 111, 143, 48, 8
- DEFPUSHBUTTON "OK", IDOK, 16, 172, 44, 14
- PUSHBUTTON "Cancel", IDCANCEL, 76, 172, 44, 14
- PUSHBUTTON "Help", IDC_HELPBUTTON, 156, 172, 44, 14
- PUSHBUTTON "Log File", IDC_LOGFILE, 224, 172, 50, 14
+ EDITTEXT IDC_ARGS, 6, 52, 268, 36, ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | WS_BORDER | WS_TABSTOP | WS_CHILD
+ LTEXT "Output:", -1, 8, 103, 36, 8
+ COMBOBOX IDC_OUTPUT, 46, 100, 160, 54, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+ LTEXT "Printer:", IDC_PRINTERTEXT, 8, 123, 37, 10
+ COMBOBOX IDC_PRINTER, 46, 120, 160, 64, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+ AUTOCHECKBOX "Print Errors", IDC_PRINTERROR, 218, 121, 72, 12, BS_AUTOCHECKBOX | WS_TABSTOP
+ LTEXT "Run:", -1, 8, 143, 36, 8
+ COMBOBOX IDC_SHOW, 45, 140, 100, 44, CBS_DROPDOWNLIST | WS_TABSTOP
+ CHECKBOX "Run as User", IDC_RUNUSER, 163, 141, 110, 12, BS_AUTOCHECKBOX | WS_TABSTOP
+ LTEXT "Shut down delay:", -1, 8, 163, 72, 8
+ EDITTEXT IDC_DELAY, 83, 161, 24, 12
+ LTEXT "seconds", -1, 111, 163, 48, 8
+ DEFPUSHBUTTON "OK", IDOK, 16, 192, 44, 14
+ PUSHBUTTON "Cancel", IDCANCEL, 76, 192, 44, 14
+ PUSHBUTTON "Help", IDC_HELPBUTTON, 156, 192, 44, 14
+ PUSHBUTTON "Log File", IDC_LOGFILE, 224, 192, 50, 14
  PUSHBUTTON "Browse", IDC_BROWSE, 224, 17, 50, 14
 }
 

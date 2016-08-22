@@ -1,18 +1,14 @@
-/* Copyright (C) 1997-2001, Ghostgum Software Pty Ltd.  All rights reserved.
+/* Copyright (C) 1997-2012, Ghostgum Software Pty Ltd.  All rights reserved.
   
   This file is part of RedMon.
   
-  This program is distributed with NO WARRANTY OF ANY KIND.  No author
-  or distributor accepts any responsibility for the consequences of using it,
-  or for whether it serves any particular purpose or works at all, unless he
-  or she says so in writing.  Refer to the RedMon Free Public Licence 
-  (the "Licence") for full details.
-  
-  Every copy of RedMon must include a copy of the Licence, normally in a 
-  plain ASCII text file named LICENCE.  The Licence grants you the right 
-  to copy, modify and redistribute RedMon, but only under certain conditions 
-  described in the Licence.  Among other things, the Licence requires that 
-  the copyright notice and this notice be preserved on all copies.
+  This software is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+
+  This software is distributed under licence and may not be copied, modified
+  or distributed except as expressly authorised under the terms of the
+  LICENCE.
 
   Modified in 2010 by Jonas Oberschweiber.
 */
@@ -24,7 +20,7 @@
  *   Windows 95, 98
  *   Windows NT 3.5
  *   Windows NT 4.0
- *   Windows NT 5.0 (Windows 2000 Professional) - needs more testing
+ *   Windows NT 5.0 (Windows 2000 Professional) - needs more testing (Jonas Oberschweiber)
  *
  * This file contains the general port monitor code
  * but not the code that actually does the useful work.
@@ -45,6 +41,7 @@
 
 #define STRICT
 #include <windows.h>
+#include <htmlhelp.h>
 #include "portmon.h"
 #include "portrc.h"
 
@@ -53,6 +50,14 @@ TCHAR rekey[MAXSTR];   /* Registry key name for our use */
 HINSTANCE hdll;
 #ifdef UNICODE
 int ntver;	/* 351, 400, 500 */
+    /* 601 = Windows 7 or Windows Server 2008 R2
+     * 600 = Windows Vista or Windows Server 2008
+     * 502 = Windows XP x64 or Windows Server 2003
+     * 501 = Windows XP
+     * 500 = Windows 2000 
+     * 400 = Windows NT 4.0
+     * 351 = Windows NT 3.51
+     */
 #endif
 
 /* REDATA must be defined */
@@ -104,11 +109,11 @@ syslog(LPCTSTR buf)
 #endif
     DWORD cbWritten;
     HANDLE hfile;
-    /*if (buf == NULL)
+    if (buf == NULL)
 	buf = TEXT("(null)");
 
-    if ((hfile = CreateFileA("c:\\redmon.log", GENERIC_WRITE, 
-	0 /* no file sharing , NULL, OPEN_ALWAYS, 0, NULL)) 
+    if ((hfile = CreateFileA("c:\\temp\\redmon.log", GENERIC_WRITE, 
+	0 /* no file sharing */, NULL, OPEN_ALWAYS, 0, NULL)) 
 		!= INVALID_HANDLE_VALUE) {
 	SetFilePointer(hfile, 0, NULL, FILE_END);
 #ifdef UNICODE
@@ -122,9 +127,8 @@ syslog(LPCTSTR buf)
 #else
 	WriteFile(hfile, buf, lstrlen(buf), &cbWritten, NULL);
 #endif
-	CloseHandle(hfile);*/        
-    OutputDebugString(buf);
-    //}
+	CloseHandle(hfile);
+    }
 }
 
 void
@@ -165,6 +169,7 @@ TCHAR buf[MAXSTR];
 void
 show_help(HWND hwnd, int id)
 {
+    TCHAR topic[2*MAXSTR+7];
     TCHAR buf[MAXSTR];
     TCHAR helpfile[MAXSTR];
     TCHAR *p;
@@ -184,13 +189,18 @@ show_help(HWND hwnd, int id)
 
     /* get topic name */
     LoadString(hdll, id, buf, sizeof(buf)/sizeof(TCHAR) - 1);
+    wsprintf(topic, TEXT("%s::%s.htm"), helpfile, buf);
+    for (p=topic; *p; p++)
+	if (*p == ' ')
+	    *p = '_';
+#ifdef DEBUG_REDMON
+syslog(TEXT("show_help \042"));
+syslog(topic);
+syslog(TEXT("\042\r\n"));
+#endif
 
     /* show help */
-#if defined(_WIN64) || defined(GWLP_USERDATA)
-    WinHelp(hwnd, helpfile, HELP_KEY, (ULONG_PTR)buf);
-#else
-    WinHelp(hwnd, helpfile, HELP_KEY, (DWORD)buf);
-#endif
+    HtmlHelp(hwnd, topic, HH_DISPLAY_TOPIC, 0);
 }
 
 LONG
@@ -365,8 +375,17 @@ RedMonSetValue(HANDLE hMonitor, HANDLE hcKey, LPCTSTR pszValue, DWORD dwType,
 {
     LONG rc = ERROR_SUCCESS;
 #ifdef DEBUG_REDMON
+    TCHAR buf[MAXSTR];
     syslog(TEXT("RedMonSetValue "));
     syslog(pszValue);
+    if (dwType==REG_DWORD) {
+        wsprintf(buf, TEXT(" REG_DWORD %ld"), (*(LPDWORD)pData));
+	syslog(buf);
+    }
+    else if (dwType=REG_SZ) {
+        wsprintf(buf, TEXT(" REG_SZ \042%s\042"), pData);
+	syslog(buf);
+    }
     syslog(TEXT("\r\n"));
 #endif
 #ifdef NT50
@@ -1733,7 +1752,7 @@ GetNTversion(void)
 #ifdef UNICODE
 #ifdef NT35
 /* Windows NT 3.51 */
-BOOL WINAPI _export
+PORTMONEXPORT BOOL WINAPI _export
 InitializeMonitor(LPWSTR pRegisterRoot)
 {
 #ifdef UNUSED
@@ -1780,7 +1799,7 @@ MONITOREX mex = {
     }
 };
 
-LPMONITOREX WINAPI _export
+PORTMONEXPORT LPMONITOREX WINAPI _export
 InitializePrintMonitor(LPWSTR pRegisterRoot)
 {
 #ifdef DEBUG_REDMON
@@ -1832,12 +1851,13 @@ MONITOR2 mon2 = {
 #endif
 };
 
-LPMONITOR2 WINAPI 
+PORTMONEXPORT LPMONITOR2 WINAPI _export
 InitializePrintMonitor2(PMONITORINIT pMonitorInit, PHANDLE phMonitor)
 {
 #ifdef UNUSED
     MessageBox(NULL, TEXT("InitializePrintMonitor2"), MONITORNAME, MB_OK);
 #endif
+    GetNTversion();
 #ifdef DEBUG_REDMON
     syslog(TEXT("InitializePrintMonitor2"));
     syslog(TEXT("\r\n  cbSize="));
@@ -1850,6 +1870,8 @@ InitializePrintMonitor2(PMONITORINIT pMonitorInit, PHANDLE phMonitor)
     syshex((DWORD)(pMonitorInit->pMonitorReg));
     syslog(TEXT("\r\n  bLocal="));
     sysnum(pMonitorInit->bLocal);
+    syslog(TEXT("\r\n  ntver="));
+    sysnum(ntver);
     syslog(TEXT("\r\n"));
 #endif
     GetNTversion();
@@ -1917,19 +1939,20 @@ MONITORUI mui = {
     rcDeletePortUIOuter
 };
 
-PMONITORUI WINAPI 
+PORTMONEXPORT PMONITORUI WINAPI _export
 InitializePrintMonitorUI(VOID)
 {
 #ifdef DEBUG_REDMON
     syslog(TEXT("InitializePrintMonitorUI\r\n"));
 #endif
+    GetNTversion();
     return &mui;
 } 
 #endif	/* NT50 */
 
 #else	/* !UNICODE */
 /* Windows 95 version */
-BOOL WINAPI 
+PORTMONEXPORT BOOL WINAPI _export
 InitializeMonitorEx(LPTSTR pRegisterRoot, LPMONITOR pMonitor)
 {
 #ifdef DEBUG_REDMON
@@ -1984,7 +2007,7 @@ DllEntryPoint(HINSTANCE hInst, DWORD fdwReason, LPVOID lpReserved)
 #pragma argsused
 #endif
 /* DLL entry point for Microsoft Visual C++ */
-BOOL WINAPI
+PORTMONEXPORT BOOL WINAPI
 DllMain(HINSTANCE hInst, DWORD fdwReason, LPVOID lpReserved)
 {
     return DllEntryPoint(hInst, fdwReason, lpReserved);
@@ -2098,12 +2121,12 @@ TCHAR mess[MAXSTR];
 /*
 #define PSTEST "(c:/rjl/monitor/test.txt) (w) file\n dup (Hello, world\\n) writestring closefile\n(Hello, world\\n) print flush\n"
 #define PSTEST "(c:/gstools/gs5.50/colorcir.ps) run flush\n"
-#define PSTEST "(d:/data/src/a20.ps) run flush\n"
+#define PSTEST "(c:/data/src/a20.ps) run flush\n"
 */
-#define PSTEST "(d:/rjl/src/a20.ps) run flush\n"
+#define PSTEST "(c:/data/src/a20.ps) run flush\n"
 
 #ifdef NT50
-/* test Windows 2000 monitor on Nt4.0 */
+/* test Windows 2000 monitor on NT4.0 */
 int PASCAL 
 WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int cmdShow)
 {

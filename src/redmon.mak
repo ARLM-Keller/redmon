@@ -1,18 +1,15 @@
-# Copyright (C) 1997-2001, Ghostgum Software Pty Ltd.  All rights reserved.
+# Copyright (C) 1997-2012, Ghostgum Software Pty Ltd.  All rights reserved.
 #  
 #  This file is part of RedMon.
 #  
-#  This program is distributed with NO WARRANTY OF ANY KIND.  No author
-#  or distributor accepts any responsibility for the consequences of using it,
-#  or for whether it serves any particular purpose or works at all, unless he
-#  or she says so in writing.  Refer to the RedMon Free Public Licence 
-#  (the "Licence") for full details.
-#  
-#  Every copy of RedMon must include a copy of the Licence, normally in a 
-#  plain ASCII text file named LICENCE.  The Licence grants you the right 
-#  to copy, modify and redistribute RedMon, but only under certain conditions 
-#  described in the Licence.  Among other things, the Licence requires that 
-#  the copyright notice and this notice be preserved on all copies.
+#  This software is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+#
+#  This software is distributed under licence and may not be copied, modified
+#  or distributed except as expressly authorised under the terms of the
+#  LICENCE.
+
 
 #
 # File modified by Gilles Vollant (2005) for AMD64 and IA64 support
@@ -22,27 +19,83 @@
 
 # redmon.mak
 # Makefile for redmon.dll, a print monitor
-# BC++ 4.5, MSVC++ 5.0, 6.0
+# MSVC++ 9 (2008) and 10 (2010)
+# Older versions may compile 32-bit, but not 64-bit version.
+# Apart from the compiler, you will also need to install the 
+# Windows 7.1 Driver Kit (or perhaps the older Windows DDK)
+# and HTML Help compiler.
 
 # LANGUAGE=en (english), de (german), fr (french), se (swedish)
 LANGUAGE=en
 
-# VISUALC=0 for Borland C++ 4.5
-# VISUALC=5 for MS Visual C++ 5.0
-# VISUALC=6 for MS Visual C++ 6.0
-# VISUALC=8 for MS Visual C++ 8.0 (Visual Studio 2005)
+# DEBUG=1 for debugging
+DEBUG=0
+
+# VISUALC=0 for Borland C++ 4.5			[untested]
+# VISUALC=5 for MS Visual C++ 5.0		[untested]
+# VISUALC=6 for MS Visual C++ 6.0		[untested]
+# VISUALC=7 for MS Visual C++ 7.0 (.NET)	[untested]
+# VISUALC=71 for MS Visual C++ 7.1 (.NET 2003)	[untested]
+# VISUALC=8 for MS Visual C++ 8 (.NET 2005)	[x64 doesn't compile, untested]
+# VISUALC=9 for MS Visual C++ 9 (Studio 2008)	[untested, compiles]
+# VISUALC=10 for MS Visual C++ 10 (Studio 2010)
+
+!if "$(_NMAKE_VER)" == "8.00.50727.42"
 VISUALC=8
+!endif
+!if "$(_NMAKE_VER)" == "8.00.50727.762"
+VISUALC=8
+!endif
+!if "$(_NMAKE_VER)" == "9.00.30729.01"
+VISUALC=9
+!endif
+!if "$(_NMAKE_VER)" == "9.00.21022.08"
+VISUALC=9
+!endif
+!if "$(_NMAKE_VER)" == "10.00.30319.01"
+VISUALC=10
+!endif
+!ifndef VISUALC
+VISUALC=10
+!endif
 
 # put TARGETX64
 TARGETX64=0
 TARGETIA64=0
 
 # Edit DEVBASE as required
-!if $(VISUALC)
-#DEVBASE=f:\Program Files\Microsoft Visual Studio
-DEVBASE=c:\Program Files (x86)\Microsoft Visual Studio 9.0
+!if $(VISUALC) == 5
+DEVBASE=c:\devstudio
+!endif
+!if $(VISUALC) == 6
+DEVBASE=c:\Program Files\Microsoft Visual Studio
+!endif
+!if $(VISUALC) == 7
+DEVBASE=c:\Program Files\Microsoft Visual Studio .NET
+!endif
+!if $(VISUALC) == 71
+DEVBASE=c:\Program Files\Microsoft Visual Studio .NET 2003
+!endif
+!if $(VISUALC) == 8
+DEVBASE=c:\Program Files\Microsoft Visual Studio 8
+!endif
+!if $(VISUALC) == 9
+DEVBASE=c:\Program Files\Microsoft Visual Studio 9.0
+!endif
+!if $(VISUALC) == 10
+DEVBASE=c:\Program Files\Microsoft Visual Studio 10.0
+!endif
+
+
+!if $(VISUALC) >= 9
+# Windows Driver Kit 7.1.0
+DDKINC=C:\WinDDK\7600.16385.1\inc\win7
+DDKLIB=C:\WinDDK\7600.16385.1\lib\win7\i386
 !else
 DEVBASE=c:\bc45
+# Windows 2003 SP1 DDK
+DDKINC=C:\WinDDK\3790.1830\inc\wxp
+DDKLIB=C:\WinDDK\3790.1830\lib\wxp\i386
 !endif
 
 SDKPATH=C:\Program Files\Microsoft SDKs\Windows\v6.0A
@@ -52,57 +105,52 @@ DEBUG=1
 
 # Shouldn't need editing below here
 
-!if $(VISUALC)
-# Microsoft Visual C++ 5.0
-!if $(VISUALC) > 6
-COMPBASE = $(DEVBASE)\vc
-RCOMP="$(SDKPATH)\Bin\rc.exe"
-!if $(TARGETX64)
-LIBDIR=$(SDKPATH)\Lib\x64
-COMPDIR=$(COMPBASE)\bin\x86_amd64
-LNKOPTS=/LIBPATH:"$(COMPBASE)\Lib\amd64" /LIBPATH:"$(SDKPATH)\Lib\x64"
-!else
-!if $(TARGETIA64)
-LIBDIR=$(COMPBASE)\PlatformSDK\Lib\IA64
-COMPDIR=$(COMPBASE)\bin\x86_ia64
-!else # x86
-LIBDIR=$(SDKPATH)\Lib
-COMPDIR=$(COMPBASE)\bin
-LNKOPTS=/LIBPATH:"$(COMPBASE)\Lib"  /LIBPATH:"$(SDKPATH)\Lib"
-!endif # end TARGETIA64
-!endif # end TARGETX64
-INCDIR=$(COMPBASE)\include
-LIBPRE=
-LIBPOST=@lib2.rsp
-LIBDEP=lib.rsp lib2.rsp
-CCC=cl
-EXEFLAG=/MT
-DLLFLAG=/LD
-OBJNAME=/Fo
-!if $(DEBUG)
-CDEBUG=/Zi -DDEBUG /Wp64 -D_CRT_SECURE_NO_DEPRECATE
-DEBUGLNK=/DEBUG
-!else
-CDEBUG=/O1 /Wp64 -D_CRT_SECURE_NO_DEPRECATE
-DEBUGLNK=
-!endif # end DEBUG
-RLINK=$(RCOMP)
-HC=hcw /C /E
-!else # end VISUALC > 6
 !if $(VISUALC) <= 5
 COMPBASE = $(DEVBASE)\vc
 RCOMP="$(DEVBASE)\sharedide\bin\rc"
-!else
+!endif
+
+!if $(VISUALC) == 6
 COMPBASE = $(DEVBASE)\vc98
 RCOMP="$(DEVBASE)\common\msdev98\bin\rc"
 !endif # end VISUALC <= 5
+
+!if (($(VISUALC) == 7) || ($(VISUALC) == 71))
+COMPBASE = $(DEVBASE)\Vc7
+RCOMP="$(DEVBASE)\Vc7\bin\rc"
+!endif
+
+!if $(VISUALC) == 8
+COMPBASE = $(DEVBASE)\Vc
+RCOMP="$(DEVBASE)\Vc\bin\rc"
+VFLAGS=/wd4996
+#PLATLIBDIR64=$(COMPBASE)\PlatformSDK\lib\AMD64
+PLATLIBDIR64=C:\WinDDK\3790.1830\lib\wnet\AMD64
+!endif
+
+!if $(VISUALC) == 9
+COMPBASE = $(DEVBASE)\Vc
+RCOMP="c:\Program Files\Microsoft SDKs\Windows\v6.0A\bin\rc"
+VFLAGS=/wd4996
+PLATLIBDIR64=c:\Program Files\Microsoft SDKs\Windows\v6.0A\lib\x64
+!endif
+
+!if $(VISUALC) == 10
+COMPBASE = $(DEVBASE)\Vc
+RCOMP="c:\Program Files\Microsoft SDKs\Windows\v7.0A\bin\rc"
+VFLAGS=/wd4996
+PLATLIBDIR64=c:\Program Files\Microsoft SDKs\Windows\v7.0A\lib\x64
+!endif
+
 COMPDIR=$(COMPBASE)\bin
 INCDIR=$(COMPBASE)\include
 LIBDIR=$(COMPBASE)\lib
 LIBPRE=
 LIBPOST=@lib2.rsp
-LIBDEP=lib.rsp lib2.rsp
+LIBDEP=lib.rsp lib2.rsp lib64.rsp
 CCC=cl
+COMPDIR64=$(COMPBASE)\bin\x86_amd64
+LIBDIR64=$(COMPBASE)\lib\amd64
 EXEFLAG=
 DLLFLAG=/LD
 OBJNAME=/Fo
@@ -116,7 +164,16 @@ DEBUGLNK=
 RLINK=$(RCOMP)
 HC=hcw /C /E
 !endif
+
+!if ($(VISUALC) == 10)
+PLATLIBDIR=c:\Prograil Files\Microsoft SDKs\Windows\v&.0A\Lib
+!else if ($(VISUALC) == 8) || ($(VISUALC) == 9)
+PLATLIBDIR=$(COMPBASE)\PlatformSDK\lib
+!else if (($(VISUALC) == 7) || ($(VISUALC) == 71))
+#PLATLIBDIR=$(COMPBASE)\PlatformSDK\lib
+PLATLIBDIR=C:\WinDDK\7600.16385.1\lib\win7\i386
 !else
+PLATLIBDIR=$(LIBDIR)
 COMPBASE=$(DEVBASE)
 COMPDIR=$(COMPBASE)\bin
 INCDIR=$(COMPBASE)\include
@@ -135,23 +192,14 @@ RLINK=$(COMPDIR)\brc32
 HC=$(COMPDIR)\hc31
 !endif
 
-CC="$(COMPDIR)\$(CCC)" $(CDEBUG) -I"$(INCDIR)"
+CC="$(COMPDIR)\$(CCC)" $(CDEBUG) /nologo -I"$(INCDIR)" -I"$(DDKINC)" $(VFLAGS)
+CC64="$(COMPDIR64)\$(CCC)" $(CDEBUG) -I"$(INCDIR)" -I"$(DDKINC)" $(VFLAGS)
 
-!if $(TARGETX64) >= 1
-all:	redmonnt.dll \
-    setup.exe unredmon.exe\
-    redpr.exe redrun.exe redfile.exe enum.exe redconf.exe
-!else
-!if $(TARGETIA64) >= 1
-all:	redmonnt.dll \
-    setup.exe unredmon.exe\
-    redpr.exe redrun.exe redfile.exe enum.exe
-!else
-all:	redmonnt.dll \
-    setup.exe unredmon.exe\
-    redpr.exe redrun.exe redfile.exe enum.exe redconf.exe
-!endif
-!endif
+all: redmon32.dll \
+    redmon.chm setup.exe unredmon.exe\
+    redpr.exe redrun.exe redfile.exe enum.exe\
+    redmon64.dll setup64.exe unredmon64.exe
+# redmonnt.dll redmon95.dll redmon35.dll  # these might still work but haven't been tested
 
 .c.obj:
 	$(CC) -c $*.c
@@ -175,45 +223,79 @@ lib.rsp: redmon.mak
 	echo "$(LIBDIR)\user32.lib" >> lib.rsp
 	echo "$(LIBDIR)\winspool.lib" >> lib.rsp
 	echo "$(LIBDIR)\advapi32.lib" >> lib.rsp
-    echo "$(LIBDIR)\shell32.lib" >> lib.rsp
+	echo "$(LIBDIR)\shell32.lib" >> lib.rsp
+	echo "$(DDKLIB)\spoolss.lib" >> lib.rsp
+	echo "$(DDKLIB)\psapi.lib" >> lib.rsp
+	echo "$(DDKLIB)\userenv.lib" >> lib.rsp
+	echo "$(DDKLIB)\htmlhelp.lib" >> lib.rsp
 
 lib2.rsp: redmon.mak
 	echo /link > lib2.rsp
-	echo "$(LIBDIR)\comdlg32.lib" >> lib2.rsp
-	echo "$(LIBDIR)\gdi32.lib" >> lib2.rsp
-	echo "$(LIBDIR)\user32.lib" >> lib2.rsp
-	echo "$(LIBDIR)\winspool.lib" >> lib2.rsp
-	echo "$(LIBDIR)\advapi32.lib" >> lib2.rsp
+	echo "$(DDKLIB)\comdlg32.lib" >> lib2.rsp
+	echo "$(DDKLIB)\gdi32.lib" >> lib2.rsp
+	echo "$(DDKLIB)\user32.lib" >> lib2.rsp
+	echo "$(DDKLIB)\winspool.lib" >> lib2.rsp
+	echo "$(DDKLIB)\advapi32.lib" >> lib2.rsp
 
-setup.exe: setup.c setup.h redmon.h redmonrc.h setup.res $(LIBDEP)
+lib64.rsp: redmon.mak
+	echo "$(PLATLIBDIR64)\comdlg32.lib" > lib64.rsp
+	echo "$(PLATLIBDIR64)\gdi32.lib" >> lib64.rsp
+	echo "$(PLATLIBDIR64)\kernel32.lib" >> lib64.rsp
+	echo "$(PLATLIBDIR64)\user32.lib" >> lib64.rsp
+	echo "$(PLATLIBDIR64)\winspool.lib" >> lib64.rsp
+	echo "$(PLATLIBDIR64)\advapi32.lib" >> lib64.rsp
+	echo "$(PLATLIBDIR64)\psapi.lib" >> lib64.rsp
+	echo "$(PLATLIBDIR64)\userenv.lib" >> lib64.rsp
+	echo "$(PLATLIBDIR64)\htmlhelp.lib" >> lib64.rsp
+	echo "/NODEFAULTLIB:libcmt" >> lib64.rsp
+	echo "$(LIBDIR64)\libcmt.lib" >> lib64.rsp
+
+setup.exe: setup.c setup.h redmon.h redmonrc.h setup.res setup.def setup_x86.manifest $(LIBDEP)
 !if $(VISUALC)
 	$(CC) -c $(EXEFLAG) setup.c
-	"$(COMPDIR)\link" $(DEBUGLNK) $(LNKOPTS) /DEF:setup.def /OUT:setup.exe setup.obj @lib.rsp setup.res
+	"$(COMPDIR)\link" $(DEBUGLNK) /DEF:setup.def /OUT:setup.exe setup.obj @lib.rsp setup.res
+	mt -nologo -manifest setup_x86.manifest -outputresource:setup.exe;#1
 !else
 	$(CC) $(EXEFLAG) $(LIBPRE) setup.c
 	$(RLINK) setup.res setup.exe
 !endif
 
-unredmon.exe: unredmon.c unredmon.res unredmon.h redmon.h redmonrc.h $(LIBDEP)
-!if $(VISUALC)
+unredmon.exe: unredmon.c unredmon.res unredmon.h redmon.h redmonrc.h unredmon.def unredmon_x86.manifest $(LIBDEP)
+!if $(VISUALC) >= 8
 	$(CC) -c $(EXEFLAG) unredmon.c
-	"$(COMPDIR)\link" $(DEBUGLNK) $(LNKOPTS) /DEF:unredmon.def /OUT:unredmon.exe unredmon.obj @lib.rsp unredmon.res
+	"$(COMPDIR)\link" $(DEBUGLNK) /DEF:unredmon.def /OUT:unredmon.exe unredmon.obj @lib.rsp unredmon.res
+	mt -nologo -manifest unredmon_x86.manifest -outputresource:unredmon.exe;#1
+
+setup64.exe: setup.c setup.h redmon.h redmonrc.h setup.res setup_x64.manifest $(LIBDEP)
+	$(CC64) -c $(EXEFLAG) $(OBJNAME)setup64.obj setup.c
+	"$(COMPDIR64)\link" $(DEBUGLNK) /OUT:setup64.exe setup64.obj @lib64.rsp setup.res
+	mt -nologo -manifest setup_x64.manifest -outputresource:setup64.exe;#1
+
+unredmon64.exe: unredmon.c unredmon.res unredmon.h redmon.h redmonrc.h unredmon_x64.manifest $(LIBDEP)
+	$(CC64) -c $(EXEFLAG) $(OBJNAME)unredmon64.obj unredmon.c
+	"$(COMPDIR64)\link" $(DEBUGLNK) /OUT:unredmon64.exe unredmon64.obj @lib64.rsp unredmon.res
+	mt -nologo -manifest unredmon_x64.manifest -outputresource:unredmon64.exe;#1
 !else
-	$(CC) $(EXEFLAG) -L$(LIBDIR) unredmon.c
-	$(RLINK) unredmon.res unredmon.exe
+# Don't build 64-bit with older compilers
+setup64.exe: setup.c
+unredmon64.exe: umredmon.c
 !endif
 
-doc2rtf.exe: doc2rtf.c $(LIBDEP)
-	$(CC) $(LIBPRE) doc2rtf.c $(LIBPOST) 
 
+doc2hhp.exe: doc2hhp.c $(LIBDEP)
+	$(CC) $(LIBPRE) doc2hhp.c $(LIBPOST) 
 
-redmon.hlp: $(LANGUAGE)\redmon.txt $(LANGUAGE)\redmon.hpj doc2rtf.exe
-	doc2rtf $(LANGUAGE)\redmon.txt $(LANGUAGE)\redmon.rtf redmon.cnt
-	cd $(LANGUAGE)
-	$(HC) redmon.hpj
+redmon.chm: $(LANGUAGE)\redmon.txt doc2hhp.exe
+	-mkdir htmlhelp
+# Currently no images in help file
+#	-copy $(LANGUAGE)\binary\*.gif htmlhelp
+	copy $(LANGUAGE)\redmon.txt htmlhelp
+	cd htmlhelp
+	..\doc2hhp redmon.txt redmon.hhp
+	-"C:\Program Files\HTML Help Workshop\hhc.exe" redmon.hhp
 	cd ..
-	copy $(LANGUAGE)\redmon.hlp redmon.hlp
-	
+	copy htmlhelp\redmon.chm .
+
 # doc2html.c sources are in GSview
 doc2html.exe: doc2html.c $(LIBDEP)
 	$(CC) $(LIBPRE) doc2html.c $(LIBPOST) 
@@ -228,15 +310,38 @@ redmon95.obj: redmon.c portmon.h redmon.h redmonrc.h
 port95.obj: portmon.c portmon.h redmon.h redmonrc.h
 	$(CC) -c $(DLLFLAG) $(OBJNAME)port95.obj portmon.c
 
-redmon95.dll: redmon95.obj port95.obj redmon.res $(LIBDEP)
-!if $(VISUALC)
+redmon95.dll: redmon95.obj port95.obj redmon.res redmon95.def $(LIBDEP)
 	"$(COMPDIR)\link" $(DEBUGLNK) /DLL /DEF:redmon95.def /OUT:redmon95.dll redmon95.obj port95.obj @lib.rsp redmon.res
+
+
+# NT 64-bit DLL
+!if $(VISUALC) >= 8
+redmon64.obj: redmon.c portmon.h redmon.h redmonrc.h
+	$(CC64) -c $(DLLFLAG) -DUNICODE -DNT50 $(OBJNAME)redmon64.obj redmon.c
+
+port64.obj: portmon.c portmon.h redmon.h redmonrc.h
+	$(CC64) -c $(DLLFLAG) -DUNICODE -DNT50 $(OBJNAME)port64.obj portmon.c
+
+redmon64.dll: redmon64.obj port64.obj redmon.res $(LIBDEP)
+	"$(COMPDIR64)\link" $(DEBUGLNK) /DLL /OUT:redmon64.dll redmon64.obj port64.obj @lib64.rsp redmon.res
 !else
-	$(CC) $(DLLFLAG) -L$(LIBDIR) -eredmon95.dll redmon95.obj
-	$(RLINK) redmon.res redmon95.dll
+# Don't build 64-bit with older compilers
+redmon64.dll: redmon.c
 !endif
 
-# NT 4/5 DLL
+# NT 5 DLL (Windows 2000 and later)
+redmon32.obj: redmon.c portmon.h redmon.h redmonrc.h
+	$(CC) -c $(DLLFLAG) -DUNICODE -DNT50 $(OBJNAME)redmon32.obj redmon.c
+
+port32.obj: portmon.c portmon.h redmon.h redmonrc.h
+	$(CC) -c $(DLLFLAG) -DUNICODE -DNT50 $(OBJNAME)port32.obj portmon.c
+
+redmon32.dll: redmon32.obj port32.obj redmon.res $(LIBDEP) redmon32.def
+	"$(COMPDIR)\link" $(DEBUGLNK) /DLL /DEF:redmon32.def /OUT:redmon32.dll redmon32.obj port32.obj @lib.rsp redmon.res
+
+
+
+# NT 4/5 DLL (Windows NT 4 / Windows 2000 and later)
 redmonnt.obj: redmon.c portmon.h redmon.h redmonrc.h
 	$(CC) -c $(DLLFLAG) -DUNICODE -DNT50 -DNT40 $(OBJNAME)redmonnt.obj redmon.c
 
@@ -245,7 +350,7 @@ portnt.obj: portmon.c portmon.h redmon.h redmonrc.h
 
 redmonnt.dll: redmonnt.obj portnt.obj redmon.res $(LIBDEP) redmonnt.def
 !if $(VISUALC)
-	"$(COMPDIR)\link" $(DEBUGLNK) $(LNKOPTS) /DLL /DEF:redmonnt.def /OUT:redmonnt.dll portnt.obj redmonnt.obj @lib.rsp redmon.res
+	"$(COMPDIR)\link" $(DEBUGLNK) $(LNKOPTS) /DLL /DEF:redmonnt.def /OUT:redmonnt.dll redmonnt.obj portnt.obj @lib.rsp redmon.res
 !else
 	$(CC) $(DLLFLAG) -L$(LIBDIR) -eredmonnt.dll redmonnt.obj
 	$(RLINK) redmon.res redmonnt.dll
@@ -333,7 +438,7 @@ cleanlanguage:
 	-del unredmon.rc
 	-del unredmon.res
 	-del $(LANGUAGE)\redmon.rtf
-	-del redmon.hlp
+	-del redmon.chm
 
 clean:	cleanlanguage
 	-del redmon.cnt
@@ -359,6 +464,18 @@ clean:	cleanlanguage
 	-del redmonnt.map
 	-del redmonnt.ilk
 	-del redmonnt.pdb
+	-del redmon32.obj
+	-del redmon32.lib
+	-del redmon32.exp
+	-del redmon32.map
+	-del redmon32.ilk
+	-del redmon32.pdb
+	-del redmon64.obj
+	-del redmon64.lib
+	-del redmon64.exp
+	-del redmon64.map
+	-del redmon64.ilk
+	-del redmon64.pdb
 	-del port35.tr2
 	-del port35.obj
 	-del port35.lib
@@ -380,6 +497,18 @@ clean:	cleanlanguage
 	-del portnt.map
 	-del portnt.ilk
 	-del portnt.pdb
+	-del port32.obj
+	-del port32.lib
+	-del port32.exp
+	-del port32.map
+	-del port32.ilk
+	-del port32.pdb
+	-del port64.obj
+	-del port64.lib
+	-del port64.exp
+	-del port64.map
+	-del port64.ilk
+	-del port64.pdb
 	-del redmon2.obj
 	-del redmon4.obj
 	-del redmon5.obj
@@ -390,6 +519,13 @@ clean:	cleanlanguage
 	-del setup.tr2
 	-del setup.ilk
 	-del setup.pdb
+	-del setup64.obj
+	-del setup64.lib
+	-del setup64.exp
+	-del setup64.map
+	-del setup64.tr2
+	-del setup64.ilk
+	-del setup64.pdb
 	-del unredmon.obj
 	-del unredmon.lib
 	-del unredmon.exp
@@ -397,10 +533,17 @@ clean:	cleanlanguage
 	-del unredmon.tr2
 	-del unredmon.ilk
 	-del unredmon.pdb
-	-del doc2rtf.obj
-	-del doc2rtf.exe
-	-del doc2rtf.ilk
-	-del doc2rtf.pdb
+	-del unredmon64.obj
+	-del unredmon64.lib
+	-del unredmon64.exp
+	-del unredmon64.map
+	-del unredmon64.tr2
+	-del unredmon64.ilk
+	-del unredmon64.pdb
+	-del doc2hhp.obj
+	-del doc2hhp.exe
+	-del doc2hhp.ilk
+	-del doc2hhp.pdb
 	-del doc2html.obj
 	-del doc2html.exe
 	-del doc2html.ilk
@@ -432,8 +575,15 @@ clean:	cleanlanguage
 	-del enum.pdb
 	-del lib.rsp
 	-del lib2.rsp
+	-del lib64.rsp
 	-del vc50.pdb
 	-del vc60.pdb
+	-del vc70.pdb
+	-del vc80.pdb
+	-del vc90.pdb
+	-del vc100.pdb
+	-rmdir /s /q htmlhelp
+	-mkdir htmlhelp
 	-del oopregistrysrv.pdb
 	-del oopregistrysrv.ilk
 	-del oopregistrysrv.obj
@@ -443,10 +593,14 @@ veryclean: clean
 	-del redmon35.dll
 	-del redmon95.dll
 	-del redmonnt.dll
-	-del redmon.hlp
+	-del redmon32.dll
+	-del redmon64.dll
+	-del redmon.chm
 	-del redmon.cnt
 	-del setup.exe
 	-del unredmon.exe
+	-del setup64.exe
+	-del unredmon64.exe
 	-del redpr.exe
 	-del redrun.exe
 	-del redfile.exe
@@ -458,28 +612,34 @@ zip:
         copy README.TXT ..
 	copy FILE_ID.DIZ ..
 	copy LICENCE ..
-	copy redmon.hlp ..
-	copy redmon35.dll ..
-	copy redmon95.dll ..
-	copy redmonnt.dll ..
+	copy redmon.chm ..
+#	copy redmon35.dll ..
+#	copy redmon95.dll ..
+#	copy redmonnt.dll ..
+	copy redmon32.dll ..
+	copy redmon64.dll ..
 	copy setup.exe ..
+	copy setup64.exe ..
 	copy unredmon.exe ..
+	copy unredmon64.exe ..
 	copy redpr.exe ..
 	copy redrun.exe ..
 	copy redfile.exe ..
 	copy enum.exe ..
 	cd ..
 	-del src.zip
-	zip -9 -r src -@ < src.txt
+	zip -9 -r -X src -@ < src.txt
 	-del redmon.zip
-	zip -9 -r redmon -@ < src\dist.txt
+	zip -9 -r -X redmon -@ < src\dist.txt
 	zip -z redmon < FILE_ID.DIZ
 	-del src.txt
 	cd src
 
 betazip: 
 	-del redmonb.zip
-	zip -9 redmonb README.TXT LICENCE redmon95.dll redmonnt.dll
-	zip -9 redmonb redmon.hlp setup.exe unredmon.exe redpr.exe redrun.exe redfile.exe
+	zip -9 redmonb README.TXT LICENCE redmon.chm 
+	zip -9 redmonb redmon32.dll setup.exe unredmon.exe  
+	zip -9 redmonb redmon64.dll setup32.exe unredmon32.exe
+	zip -9 redmonb redpr.exe redrun.exe redfile.exe
 	zip -z redmonb < FILE_ID.DIZ
 

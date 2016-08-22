@@ -1,20 +1,15 @@
-/* Copyright (C) 1997-1998, Ghostgum Software Pty Ltd.  All rights reserved.
+/* Copyright (C) 1997-2012, Ghostgum Software Pty Ltd.  All rights reserved.
   
   This file is part of RedMon.
   
-  This program is distributed with NO WARRANTY OF ANY KIND.  No author
-  or distributor accepts any responsibility for the consequences of using it,
-  or for whether it serves any particular purpose or works at all, unless he
-  or she says so in writing.  Refer to the RedMon Free Public Licence 
-  (the "Licence") for full details.
-  
-  Every copy of RedMon must include a copy of the Licence, normally in a 
-  plain ASCII text file named LICENCE.  The Licence grants you the right 
-  to copy, modify and redistribute RedMon, but only under certain conditions 
-  described in the Licence.  Among other things, the Licence requires that 
-  the copyright notice and this notice be preserved on all copies.
-  
-  Modified in 2010 by Jonas Oberschweiber
+  This software is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+
+  This software is distributed under licence and may not be copied, modified
+  or distributed except as expressly authorised under the terms of the
+  LICENCE.
+
 */
 
 /* RedMon uninstall program */
@@ -22,8 +17,9 @@
 #include "redmon.h"
 #include "unredmon.h"
 
-char sysdir[256];
-char buffer[4096];
+#define MAXSTR 512
+char sysdir[MAXSTR];
+char buffer[65536];
 DWORD needed, returned;
 int rc;
 unsigned int i;
@@ -65,17 +61,177 @@ message(int id)
     return 1; 
 }
 
+/* Attempt to disconnect port from all printers, and then delete port.
+ * This will only succeed if the redirected port name (e.g. RPT1:)
+ * has the same or longer length as FILE:
+ */
+void
+disconnect_port(LPTSTR port_name)
+{
+TCHAR fileport[] = TEXT("FILE:");
+PRINTER_INFO_2 *pri2;
+PRINTER_INFO_2 *printer_info;
+PRINTER_DEFAULTS pd;
+HANDLE hPrinter;
+DWORD needed, returned;
+char enumbuf[65536];
+char printerbuf[65536];
+int rc;
+int len;
+    /* Find printer that uses this port */
+    rc = EnumPrinters(PRINTER_ENUM_CONNECTIONS | PRINTER_ENUM_LOCAL, 
+	  NULL, 2, (LPBYTE)enumbuf, sizeof(enumbuf), 
+      &needed, &returned);
+    pri2 = (PRINTER_INFO_2 *)enumbuf;
+    if (rc) {
+        for (i=0; i<returned; i++) {
+	    if (lstrcmp(pri2[i].pPortName, port_name) == 0) {
+		pd.pDatatype = NULL;
+		pd.pDevMode = NULL;
+		pd.DesiredAccess = PRINTER_ALL_ACCESS;
+		if (OpenPrinter(pri2[i].pPrinterName, &hPrinter, &pd)) {
+		    if (GetPrinter(hPrinter, 2, (LPBYTE)printerbuf, 
+			    sizeof(printerbuf), &needed)) {
+			printer_info = (PRINTER_INFO_2 *)printerbuf;
+			/* Replace port name with FILE: */
+			len = lstrlen(fileport);
+			if (lstrlen(printer_info->pPortName) >= len) {
+			    memcpy(printer_info->pPortName, fileport, 
+				(len+1) * sizeof(TCHAR));
+			}
+			SetPrinter(hPrinter, 2, printerbuf, 0);
+		    } 
+		    ClosePrinter(hPrinter);
+		}
+	    }
+        }
+     }
+     /* This may not be silent, but probably is */
+     DeletePort(NULL, HWND_DESKTOP, port_name);
+}
+
+
+#ifndef _WIN64
+typedef BOOL (WINAPI *LPFN_ISWOW64PROCESS) 
+  (HANDLE hProcess,PBOOL Wow64Process);
+LPFN_ISWOW64PROCESS fnIsWow64Process;
+
+/* This is used to exec the 64-bit setup program 
+ * if the 32-bit setup is called on Win64.
+ */
+int
+reexec(LPCTSTR prog)
+{
+    STARTUPINFO siStartInfo;
+    PROCESS_INFORMATION piProcInfo;
+    LPCTSTR cmdline = GetCommandLine();
+    TCHAR szExeName[MAXSTR];
+    TCHAR szCommandLine[MAXSTR+MAXSTR];
+    LPCTSTR args;
+    DWORD len;
+    DWORD exit_code = 0;
+
+    /* Get full path of prog in same diretory as setup.exe */
+    memset(szExeName, 0, sizeof(szExeName));
+    len = GetModuleFileName(NULL, szExeName, sizeof(szExeName)/sizeof(TCHAR)-1);
+    for (i=len-1; i>0; i--) {
+	if (szExeName[i] == '\\') {
+	    szExeName[++i] = '\0';
+	    break;
+	}
+    }	
+    lstrcpyn(szExeName+i, prog, sizeof(szExeName)/sizeof(TCHAR)-i-1);
+
+    /* Find args of this setup program */
+    args = cmdline;
+    if (*args == '\042') {
+	/* skip until closing " */
+	args++;
+	while (*args && (*args != '\042'))
+	    args++;
+	if (*args)
+	    args++;
+    }
+    else {
+	/* skip until space */
+	while (*args && (*args != ' '))
+	    args++;
+    }
+    while (*args && (*args == ' '))
+	args++;
+
+    memset(szCommandLine, 0, sizeof(szCommandLine));
+    lstrcpyn(szCommandLine, TEXT("\042"), 
+       sizeof(szCommandLine)/sizeof(TCHAR)-1);
+    len = lstrlen(szCommandLine);
+    lstrcpyn(szCommandLine+len, szExeName, 
+        sizeof(szCommandLine)/sizeof(TCHAR)-len-1);
+    len = lstrlen(szCommandLine);
+    lstrcpyn(szCommandLine+len, TEXT("\042"), 
+        sizeof(szCommandLine)/sizeof(TCHAR)-len-1);
+    if (*args) {
+	len = lstrlen(szCommandLine);
+	lstrcpyn(szCommandLine+len, TEXT(" "), 
+	    sizeof(szCommandLine)/sizeof(TCHAR)-len-1);
+	len = lstrlen(szCommandLine);
+	lstrcpyn(szCommandLine+len, args, 
+	    sizeof(szExeName)/sizeof(TCHAR)-len-1);
+    }
+
+    memset(&siStartInfo, 0, sizeof(siStartInfo));
+    siStartInfo.cb = sizeof(STARTUPINFO);
+    siStartInfo.wShowWindow = SW_SHOWNORMAL;            /* ignored */
+
+    /* Create the child process. */
+
+    if (!CreateProcess(NULL,
+        szCommandLine, /* command line                       */
+        NULL, NULL, FALSE, 0, NULL, NULL,
+        &siStartInfo,  /* STARTUPINFO pointer                */
+        &piProcInfo))  /* receives PROCESS_INFORMATION  */
+    {
+	if (!silent)
+            MessageBox(HWND_DESKTOP, szCommandLine, 
+		TEXT("RedMon uninstaller can't start"), MB_OK);
+        return 1;
+    }
+
+    /* Wait until prog finishes */
+
+    while (GetExitCodeProcess(piProcInfo.hProcess, &exit_code)) {
+	if (exit_code != STILL_ACTIVE)
+	    break;
+	else
+            WaitForSingleObject(piProcInfo.hProcess, 10000);
+    }
+
+    CloseHandle(piProcInfo.hProcess);
+    CloseHandle(piProcInfo.hThread);
+    return exit_code;
+}
+#endif
+
 
 
 int PASCAL 
 WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int cmdShow)
 {
-DWORD version = GetVersion();
+   DWORD version = GetVersion();
+   BOOL bIsWow64 = FALSE;
    phInstance = hInstance;
    if ((HIWORD(version) & 0x8000)==0)
       is_winnt = TRUE;
    if (LOBYTE(LOWORD(version)) >= 4)
       is_win4 = TRUE;
+
+#ifndef _WIN64
+    fnIsWow64Process = (LPFN_ISWOW64PROCESS)
+        GetProcAddress(GetModuleHandle("kernel32"),"IsWow64Process");
+    if (fnIsWow64Process != NULL)
+        fnIsWow64Process(GetCurrentProcess(),&bIsWow64);
+    if (bIsWow64)
+	return reexec(TEXT("unredmon64.exe"));
+#endif
 
    if (lstrlen(lpszCmdLine))
        silent = TRUE;
@@ -115,10 +271,27 @@ DWORD version = GetVersion();
    if (rc) {
       for (i=0; i<returned; i++) {
 	 if (lstrcmp(pi2[i].pMonitorName, monitorname) == 0) {
+	    /* A RedMon port still exists, and may be used by a printer */
+	    /* Attempt to disconnect and delete port */
+ 	    disconnect_port(pi2[i].pPortName);
+	 }
+      }
+   }
+
+   /* Try again, hoping that we succeeded in deleting all ports */
+   rc = EnumPorts(NULL, 2, (LPBYTE)buffer, sizeof(buffer), 
+      &needed, &returned);
+   pi2 = (PORT_INFO_2 *)buffer;
+   if (rc) {
+      for (i=0; i<returned; i++) {
+	 if (lstrcmp(pi2[i].pMonitorName, monitorname) == 0) {
+	    /* A RedMon port still exists, and may be used by a printer */
+	    /* Refuse to uninstall RedMon until the port is deleted */
             TCHAR buf[256];
 	    LoadString(phInstance, IDS_INUSE, buf, sizeof(buf)/sizeof(TCHAR)-1);
 	    wsprintf(sysdir, buf, pi2[i].pPortName);
-            MessageBox(HWND_DESKTOP, sysdir, title, MB_OK);
+            if (!silent)
+                MessageBox(HWND_DESKTOP, sysdir, title, MB_OK);
 	    return 1;
 	 }
       }
@@ -126,20 +299,73 @@ DWORD version = GetVersion();
    else
       return message(IDS_ENUMPORTS_FAILED);
 
+
    /* Try to delete the monitor */
    if (!DeleteMonitor(NULL,  
       NULL /* is_winnt ? MONITORENVNT : MONITORENV95 */, 
       monitorname))
 	return message(IDS_DELETEMONITOR_FAILED);
 
+
+
+   /* On Window7 x64, the monitor DLL was still in use after the DeleteMonitor
+    * call above.  We need to wait until the spooler reports that the monitor
+    * is no longer available before we try to delete the DLL.
+   { 
+        int loaded = 1;
+        int tries = 0;
+	int delay = 0;
+
+        while (loaded && (tries < 10))  {
+	   loaded = 0;
+	   if (EnumMonitors(NULL, 1, (LPBYTE)buffer, sizeof(buffer), 
+		&needed, &returned)) {
+	      MONITOR_INFO_1 *mi;
+	      mi = (MONITOR_INFO_1 *)buffer;
+	      for (i=0; i<returned; i++) {
+		 if (lstrcmp(mi[i].pName, monitorname) == 0) {
+		    loaded = 1;
+		    break;
+		 }
+	      }
+	   }
+	   if (loaded) {
+		tries++;
+		delay = delay + delay + 50;
+		Sleep(delay);
+	   }
+	 }
+   }
+
+
    /* Delete the monitor files */
    if (!GetSystemDirectory(sysdir, sizeof(sysdir)))
 	return message(IDS_NOSYSDIR);
    lstrcpy(buffer, sysdir);
    lstrcat(buffer, "\\");
+#ifdef _WIN64
+   lstrcat(buffer, MONITORDLL64);
+#else
+   if (bIsWow64)
+       lstrcat(buffer, MONITORDLL64);
+   else
+#if _MSC_VER >= 1500
+   lstrcat(buffer, MONITORDLL32);
+#else
    lstrcat(buffer, is_winnt ? MONITORDLLNT : MONITORDLL95);
-   if (!DeleteFile(buffer))
-	return message(IDS_ERROR_DELETE_DLL);
+#endif
+#endif
+   if (!DeleteFile(buffer)) {
+	/* Try again after a delay or two */
+	Sleep(100);
+        if (!DeleteFile(buffer)) {
+	    Sleep(1000);
+            if (!DeleteFile(buffer)) {
+	        return message(IDS_ERROR_DELETE_DLL);
+	    }
+	}
+   }
+
    lstrcpy(buffer, sysdir);
    lstrcat(buffer, "\\");
    lstrcat(buffer, MONITORHLP);

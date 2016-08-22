@@ -1,6 +1,6 @@
 RedMon - Redirection Port Monitor.
-Version 1.7.
-Redirect Windows 95/98 or NT printer
+Version 1.9.
+Redirect Windows 7, Vista or XP printer
 port to standard input of a program.
 Can be used with Ghostscript to
 emulate a PostScript printer

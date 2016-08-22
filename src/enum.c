@@ -1,26 +1,23 @@
-/* Copyright (C) 1998, Ghostgum Software Pty Ltd.  All rights reserved.
+/* Copyright (C) 1997-2012, Ghostgum Software Pty Ltd.  All rights reserved.
   
   This file is part of RedMon.
   
-  This program is distributed with NO WARRANTY OF ANY KIND.  No author
-  or distributor accepts any responsibility for the consequences of using it,
-  or for whether it serves any particular purpose or works at all, unless he
-  or she says so in writing.  Refer to the RedMon Free Public Licence 
-  (the "Licence") for full details.
-  
-  Every copy of RedMon must include a copy of the Licence, normally in a 
-  plain ASCII text file named LICENCE.  The Licence grants you the right 
-  to copy, modify and redistribute RedMon, but only under certain conditions 
-  described in the Licence.  Among other things, the Licence requires that 
-  the copyright notice and this notice be preserved on all copies.
+  This software is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+
+  This software is distributed under licence and may not be copied, modified
+  or distributed except as expressly authorised under the terms of the
+  LICENCE.
+
 */
 
 /* enum.c */
 /* List printers, ports, monitors etc. */
 /* Russell Lang, 1998-01-05 */
+/* Updated 2005-02-13 to give more details on NT */
 #include <windows.h>
 #include <stdio.h>
-
 
 
 #ifndef PORT_TYPE_WRITE
@@ -59,7 +56,7 @@ typedef LPPORT_INFO_2A LPPORT_INFO_2;
 #endif
 
 
-char buffer[16384];
+char buffer[65536];
 DWORD needed, returned;
 int rc;
 unsigned int i;
@@ -67,11 +64,17 @@ DRIVER_INFO_2 *dri2;
 PRINTER_INFO_2 *pri2;
 PORT_INFO_2 *pi2;
 MONITOR_INFO_1 *mi;
+MONITOR_INFO_2 *mi2;
 DATATYPES_INFO_1 *dti1;
 PRINTPROCESSOR_INFO_1 *ppi1;
+BOOL is_winnt = FALSE;
 
 int main(int argc, char *argv[])
 {
+   DWORD version = GetVersion();
+   if ((HIWORD(version) & 0x8000)==0)
+      is_winnt = TRUE;
+
    rc = GetPrintProcessorDirectory(NULL, NULL, 1, buffer, 
       sizeof(buffer), &needed);
    if (rc)
@@ -139,13 +142,18 @@ int main(int argc, char *argv[])
       printf("EnumPorts() failed\n");
 
    printf("\nMonitors: ");
-   rc = EnumMonitors(NULL, 1, (LPBYTE)buffer, sizeof(buffer), 
+   rc = EnumMonitors(NULL, is_winnt ? 2 : 1, (LPBYTE)buffer, sizeof(buffer), 
       &needed, &returned);
    printf("%ld bytes   %ld\n", needed, returned);
    mi = (MONITOR_INFO_1 *)buffer;
+   mi2 = (MONITOR_INFO_2 *)buffer;
    if (rc) {
       for (i=0; i<returned; i++) {
-         printf("%d: \042%s\042\n", i, mi[i].pName);
+	 if (is_winnt)
+             printf("%d: \042%s\042 \042%s\042 \042%s\042\n", 
+		i, mi2[i].pName, mi2[i].pEnvironment, mi2[i].pDLLName);
+	 else
+             printf("%d: \042%s\042 \n", i, mi[i].pName);
       }
    }
    else
