@@ -1,0 +1,39 @@
+To translate RedMon into another language, you need to
+translate the files in the "en" (english) subdirectory: 
+  redmon.txt
+  redmon.hpj
+  redmon.rc
+  setup.rc
+  unredmon.rc
+You will also need to do some screen captures from Windows 95
+and Windows NT.  To capture the dialog boxes, display the relevant
+window then press Alt+PrintScreen.  This copies a bitmap of the window
+to the clipboard.  To save this to a file, use GSview "Edit | Paste To".
+These bitmaps must use small fonts and 16 colours.
+
+Put all translated files in a sub-directory named after the language.
+
+Do not translate text strings within the .c or .h files.  
+These are debugging messages that the author might want to read.
+
+The file redmon.txt is converted by doc2rtf to redmon.rtf, then by
+the help compiler to redmon.hlp.
+The format of redmon.txt is as follows:
+- The help file is a plain text file using the ISO-Latin1 character set.
+- The first line is used as the title for HTML pages derived from
+  the help file.
+- Normal paragraphs are indented by one space.
+- Fixed format (monospaced) text is indented by two spaces or more.
+- A paragraph ends with a blank line.
+- A help topic is started with a digit in the first column.
+  These topic digits are heirarchical.  Don't change them when
+  translating.
+- A keyword is started with a ? in the first column.
+  Keywords must immediately follow the help topic (numeral).
+  Several keywords may be used.
+- Text in `backquotes` is a link if it is identical to a keyword, 
+  bold if it doesn't match.
+- Don't put spaces at the ends of lines.  These mess up the formatting.
+
+Russell Lang, Ghostgum Software Pty Ltd
+1998-12-05

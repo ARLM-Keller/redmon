@@ -1,0 +1,586 @@
+ Redirection Port Monitor
+1Overview
+?Overview
+ The `RedMon` port monitor redirects a special printer port
+ to a program.
+ `RedMon` is commonly used with Ghostscript and a non-PostScript
+ printer to emulate a PostScript printer, or with Ghostscript
+ as a PDF writer.
+
+ `RedMon` can be used with any program that accepts data on
+ standard input.
+
+ Using `RedMon` you create redirected printer ports.  If you connect a
+ Windows printer driver to the redirected printer port, all data sent
+ to the redirected port will be forwarded by `RedMon` to the
+ standard input of a program.  This program is then responsible
+ for processing the data and producing new output.
+
+ A PostScript Windows printer redirected to a RedMon port can shared
+ on a network.
+ When this printer is configured to use Ghostscript and a non-PostScript
+ printer, it appears as a PostScript printer to other network clients.
+
+ PostScript written to a RedMon port can be converted to a
+ PDF file using Ghostscript.
+
+ RedMon supports Windows 95/98, Windows 2000, NT 4.0 and 3.51.
+
+ Configuring `RedMon` is not a job for novices.
+2Installation
+?Installation
+ Run `setup.exe` to install the `RedMon` redirection port monitor.
+ The files `setup.exe`, `redmon95.dll`, `redmonnt.dll`, `redmon35.dll`,
+ `redmon.hlp` and `unredmon.exe`
+ must all be in the same directory.
+
+ Installing `RedMon` under Windows NT will require Administrator
+ privileges.
+
+ Follow the `Ghostscript Example` for the rest of the configuration.
+2Uninstallation
+?Uninstallation
+ To uninstall, you must first disconnect all printer drivers from
+ the `Redirected` ports and then delete the `Redirected` ports.
+ Use `Add/Remove Programs` from the `Control Panel` to remove
+ `RedMon - Redirection Port Monitor`.
+2Add Port
+?Add Port
+ In the `Add Redirected Port` dialog box, enter the name
+ of a port to be serviced by `RedMon`.
+ By default, the first port you define will be named `RPT1:`.
+
+ `Windows 95/98` After adding a port, you need to configure it
+ with `Port Settings` and `Spool Settings`.
+ Any printer driver connected to this port `must have` the
+ `Spool Settings` set to
+ `Disable bi-directional support for this printer`.
+
+ `Windows NT` After adding a port, you need to configure it
+ with `Configure Port`.   `Enable bidirectional support`
+ must be disabled.
+
+ You cannot use the same port name as an existing port.
+ In particular, you cannot create a redirected port named LPT1:
+2Port Settings
+?Port Settings
+?Configure Port
+ In the `Port Settings` dialog box, specify a redirection program
+ which is to receive on standard input all data sent to this port.
+ The program name is entered in the first edit field
+ and the arguments in the second edit field.
+
+ The `Output` from the program can be set to one of
+ `Program handles output`, `Prompt for filename`,
+ `Copy stdout to printer`, `Copy temporary file to printer`
+ or `Copy pipe to printer`.
+ If one of the latter three, you need to select a `Printer`.
+
+ If you select `Print Errors`, an error report page will
+ be printed.
+
+ The program can be run `Normal`, `Minimized` or `Hidden`.
+
+ `Run as User` is available only under Windows NT and is
+ usually disabled.
+
+ A `Log File` can be configured to receive standard output
+ and standard error.
+ With a log file, you can view error messages that were written
+ to standard output or standard error.
+
+ See the `Ghostscript Example` and `Common Problems`.
+3Program handles output
+?Program handles output
+ When output is set to` Program handles output`, the redirection
+ program is entirely responsible for all output.
+ If the redirection program wants to write to another printer,
+ it must do this itself.  If the redirection program wishes
+ to generate no output at all, this is also acceptable.
+3Prompt for filename
+?Prompt for filename
+ When output is set to` Prompt for filename`, the
+ redirection program should write its output to a file.
+ The name of the file is obtained from a `Save as` dialog,
+ can be obtained by inserting `%1` in the program arguments.
+ If you wish to place `%1` in the program arguments and do
+ not want it substituted with the filename, you
+ must instead use `%%1`.
+
+ For example, the program arguments might include:
+  -sOutputFile="%1"
+
+ This method is recommended for use with Ghostscript,
+ and is commonly used with a PostScript printer driver
+ and the Ghostscript pdfwrite device to create a `PDF writer`.
+
+ Do not share a printer which uses RedMon with` Prompt for filename`.
+ RedMon will not allow this because the `Save as` dialog box would
+ appear on the server computer, not the client which submitted the
+ print job.
+3Copy stdout to printer
+?Copy stdout to printer
+ When output is set to` Copy stdout to printer`, the redirection
+ program should write its output to standard output.
+ RedMon will copy this to the specified printer.
+ Standard output will not be written to the log file.
+
+ This method should not be used with Ghostscript 5.50 or earlier.
+3Copy temporary file to printer
+?Copy temporary file to printer
+ When output is set to` Copy temporary file to printer`, the
+ redirection program should write its output to a temporary file.
+ RedMon will copy this temporary file to the specified printer.
+ The name of the temporary file is specifed by RedMon, and
+ can be obtained by inserting `%1` in the program arguments.
+ If you wish to place `%1` in the program arguments and do
+ not want it substituted with the temporary filename, you
+ must instead use `%%1`.
+
+ For example, the program arguments might include:
+  -sOutputFile="%1"
+
+ This method is recommended for use with any version of Ghostscript.
+3Copy pipe to printer
+?Copy pipe to printer
+ When output is set to` Copy pipe to printer`, the redirection
+ program should write its output to a pipe created by RedMon.
+ The handle as a hexadecimal value can be obtained by
+ inserting `%h` in the program arguments.
+ RedMon will copy this pipe to the specified printer.
+
+ For example, the program arguments might include:
+  -sOutputFile="%%handle%%%h"
+
+ This method is recommended for use with Ghostscript
+ and requires Ghostscript 6.0 or later.
+3Print Errors
+?Print Errors
+ If `Print Errors` is selected and the redirection program
+ terminates prematurely, RedMon will print an error report
+ page.  This will contain the contents of the `Log File`.
+ Selecting `Print Errors` and `Debug` will result in much
+ wasted paper.
+
+ `Print Errors` is most useful when a redirection program
+ writes an error message to standard output, which is captured
+ by the log file.
+
+ `Print Errors` is ignored if `Program handles output` is
+ selected.
+3Environment Variables
+?Environment Variables
+ The redirection program can obtain some print job parameters
+ from the environment variables.  Those set by RedMon are:
+
+ `REDMON_PORT` is the port name, typically "RPT1:".
+
+ `REDMON_JOB` is the job number, an integer.
+
+ `REDMON_PRINTER` is the name of the printer (e.g. "HP DeskJet 500").
+
+ `REDMON_MACHINE` is the name of the machine that created the job
+ (e.g. "\\Desktop").
+
+ `REDMON_USER` is the name of the user who owns the job
+ (e.g. "JCITIZEN").
+ %u in the program arguments will be replaced by the name of user.
+
+ `REDMON_DOCNAME` is the name of the print job
+ (e.g. "Printer Test Page").
+ %d in the program arguments will be replaced by the name of print job.
+
+ `REDMON_FILENAME` is the file name of the output file if
+ `Prompt for filename` is used, or the temporary file if
+ `Copy temporary file to printer` is used.
+
+ `REDMON_SESSIONID` is the session id of the Windows Terminal Server
+ client session.  This will be zero if Windows Terminal Server is not used.
+
+ `TEMP` and `TMP` are directories for temporary files.
+
+ Note that under Windows NT, the redirection program runs
+ in the environment of the SYSTEM account.  Apart from the
+ above environment variables, very few are set.  The registry
+ HKEY_CURRENT_USER and user profile are that of "Default User".
+3Run as User
+?Run as User
+ "Run as User" causes the program to be run as the local user
+ who submitted the print job.
+
+ "Run as User" is only available for NT 4 or later  Do not enable
+ this if the printer is shared on a network.
+ Remote users can't run programs on your computer.
+ If a remote user tries to submit a job, the EXE will fail
+ with a message like
+  Initialization of dynamic link library
+  C:\WINNT4\system32\kernel32.dll failed.
+  The process is terminating abnormally.
+ The spooler service will then be locked up until you
+ stop and restart it.
+
+ `Run as User `is intended for launching a GUI program
+ such as GSview locally via RedRun.
+
+ While the program will have the security attributes of
+ the user who submitted the print job, it will have the
+ environment of the SYSTEM account.  User profile information
+ will not be correct.
+3Shut down delay
+?Shut down delay
+ After writing all data to the redirection program, `RedMon` will
+ normally wait up to 300 seconds for the redirection program to
+ close before writing any output to the printer and closing the log file.
+ If the program takes longer than 300 seconds to terminate, the output
+ of the program may be lost or truncated.
+ Some standard output may not get written to the log file.
+ If this occurs, you may need to increase the `Shut down delay`.
+2Log File Properties
+?Log File Properties
+?Log File
+ If you tell `RedMon` to use a log file, all standard output from
+ the redirection program will be written to this file.
+ This is useful for capturing error messages from the program to
+ which you have redirected standard input.
+
+ To use a log file, you must check `Use Log File` and then
+ specify a valid file name for the log file.
+
+ If you check `Debug`, RedMon will write extra debugging messages
+ to the log file.  These messages are probably only useful to the
+ author of RedMon.
+ If you want the log file to contain only the standard output
+ of the redirected program, uncheck `Debug`.
+
+ See the `Ghostscript Example`.
+2What is Ghostscript?
+?What is Ghostscript?
+?Ghostscript
+ Ghostscript is the name of a set of software that provides:
+
+ - An interpreter for the PostScript (TM) language and the Adobe
+ Portable Document Format (PDF -- sometimes confused with Acrobat,
+ Adobe's PDF browser/editor product), and
+
+ - A set of C procedures (the Ghostscript library) that implement
+ the graphics and filtering (data compression / decompression / conversion)
+ capabilities that appear as primitive operations in the PostScript language
+ and in PDF.
+
+ Ghostscript is available for Microsoft Windows, IBM OS/2,
+ DEC VMS and many versions of Unix from
+   http://www.cs.wisc.edu/~ghost/
+
+ Ghostscript is a copyright work owned by Aladdin Enterprises.
+
+ GSview is a previewer from Ghostgum Software Pty Ltd, based on
+ Ghostscript.  GSview is available from
+   http://www.cs.wisc.edu/~ghost/gsview/
+
+ If you wish to use Ghostscript with `RedMon`, you should install
+ Ghostscript using the `setup` program provided with it.
+ Use GSview to make sure that Ghostscript is running correctly
+ before trying to use RedMon.
+2Ghostscript Example
+?Ghostscript Example
+ Windows 95/98 and Windows NT have slightly different configurations.
+
+ In the following examples, the Ghostscript command
+  c:\gs\gs7.03\bin\gswin32c.exe
+ and the Ghostscript include path
+  -Ic:\gs\gs7.03\lib;c:\gs\fonts
+ will both need to be changed to match your version of Ghostscript.
+3Ghostscript Example for Windows 95/98
+?Ghostscript Example for Windows 95/98
+ You can use Ghostscript with `RedMon` to create a PostScript printer.
+
+ To print to a HP DeskJet 500 printer whose queue name is
+ "HP DeskJet 500", first create a file named
+ c:\gs\djet500.rsp which contains the following:
+  -Ic:\gs\gs7.03\lib;c:\gs\fonts
+  -sDEVICE=djet500
+  -dNOPAUSE
+  -dSAFER
+  -sPAPERSIZE=a4
+
+ See the Ghostscript files `Use.htm` and `Install.htm` for
+ an explanation of these options.
+
+ View the printer properties of an existing printer,
+ select the `Details` tab, then select the `Add Port `button.
+ Select `Other`, `Redirected Port` then `OK`.
+
+ {bml addport1.bmp}
+
+ The RedMon `Add Port` dialog will appear.  Accept the defaults.
+
+ {bml addport2.bmp}
+
+ Using the `Add Printer` wizard, create a new printer object for a
+ PostScript printer.
+ A suitable one is `Apple LaserWriter II NT`.
+
+ Open the printer properties of this new PostScript printer,
+ select the `Details` tab, then change the
+ `Print to the following port` field to the RedMon port you created,
+ which was probably RPT1:
+
+ {bml property.bmp}
+
+ Select the `Port Settings` button.
+ The `RPT1 Properties` dialog will appear.
+
+ Enter the program name
+  c:\gs\gs7.03\bin\gswin32c.exe
+ and the arguments
+  @c:\gs\djet500.rsp -sOutputFile="%1" -
+ Make sure you include the space and `dash` at the end of the line.
+ Failure to do this could result in Ghostscript stalling the
+ print queue.
+ Set output to `Copy temporary file to printer` and set printer
+ to `HP DeskJet 500`.
+
+ {bml portset1.bmp}
+
+ If you want to see what is written to stdout (i.e. you want to
+ to look at error messages), see `Log File Properties`.
+
+ {bml portset2.bmp}
+
+ Press the OK buttons on the `Log File Properties` and
+ `RPT1 Properties` dialog boxes.
+
+ From the printer properties of this PostScript printer,
+ select the `Details` tab, then select the `Spool Settings` button.
+ Change the `Spool data format` to `RAW`.
+ Select `Disable bi-directional support for this printer`
+ This last change is most important.
+
+ {bml spoolset.bmp}
+
+ From the printer properties of this PostScript printer,
+ select the `PostScript` tab.  Make sure that `PostScript header`
+ is `Download header with each print job`.
+ Select the `Advanced` button to display the
+ `Advanced PostScript Options`.
+ `Data format` should be `ASCII data`.
+ Deselect both `Send CTRL+D before job` and `Send CTRL+D after job`.
+
+ Printing to this `Apple LaserWriter II NT` printer will now
+ print using Ghostscript.
+ If you share this printer on a network, it will appear as a
+ PostScript printer to other network clients.
+
+ For a list of available Ghostscript printer devices, change
+ to the Ghostscript directory c:\gs\gs7.03\bin then run
+  gswin32c -h
+ If your printer is not listed, have a look at
+  http://www.cs.wisc.edu/~ghost/doc/printer.htm
+ to see if one of the existing Ghostscript printer devices
+ will work with your printer.
+3Ghostscript Example for Windows NT 4.0
+?Ghostscript Example for Windows NT 4.0
+ You can use Ghostscript with `RedMon` to create a PostScript printer.
+
+ To print to a HP DeskJet 500 printer whose queue name is
+ "HP DeskJet 500", first create a file named
+ c:\gs\djet500.rsp which contains the following:
+  -Ic:\gs\gs7.03\lib;c:\gs\fonts
+  -sDEVICE=djet500
+  -dNOPAUSE
+  -dSAFER
+  -sPAPERSIZE=a4
+
+ See the Ghostscript files `Use.htm` and `Install.htm` for
+ an explanation of these options.
+
+ Start the `Add Printer` Wizard.
+ On the second page select `Add Port`.
+
+ {bml ntaddp1.bmp}
+
+ Select `Redirected Port` then `New Port`.
+ The RedMon `Add Port` dialog will appear.
+ Accept the defaults.
+
+ {bml addport2.bmp}
+
+ Press `Close` then `Configure Port`.
+ The `RPT1 Properties` dialog will appear.
+
+ Enter the program name
+  c:\gs\gs7.03\bin\gswin32c.exe
+ and the arguments
+  @c:\gs\djet500.rsp -sOutputFile="%1" -
+ Make sure you include the space and `dash` at the end of the line.
+ Failure to do this could result in Ghostscript stalling the
+ print queue.
+ Set output to `Copy temporary file to printer` and set printer
+ to `HP DeskJet 500`.
+
+ {bml portset1.bmp}
+
+ If you want to see what is written to stdout (i.e. you want to
+ to look at error messages), see `Log File Properties`.
+
+ {bml portset2.bmp}
+
+ Press the OK buttons on the `Log File Properties` and
+ `RPT1 Properties` dialog boxes.
+
+ Select the `Apple LaserWriter II NT v47.0` from the
+ manufacturer and model page of the Add Printer Wizard.
+
+ Printing to this `Apple LaserWriter II NT` printer will now
+ print using Ghostscript.
+ If you share this printer on a network, it will appear as a
+ PostScript printer to other network clients.
+
+ For a list of available Ghostscript printer devices, change
+ to the Ghostscript directory c:\gs\gs7.03\bin then run
+  gswin32c -h
+ If your printer is not listed, have a look at
+  http://www.cs.wisc.edu/~ghost/doc/printer.htm
+ to see if one of the existing Ghostscript printer devices
+ will work with your printer.
+
+ If you want to configure the redirected port later,
+ open the printer properties, select the `Ports` tab,
+ then `Configure Ports`.
+ RedMon requires that bi-directional support be disabled,
+ but it appears that it can't be enabled.
+
+ {bml ntprop.bmp}
+3Ghostscript Example with HP LaserJet printer
+?Ghostscript Example with HP LaserJet printer
+?LaserJet
+ For the HP LaserJet 4L printer, you need to use the Ghostscript
+ device ljet4 with resolution set to 300dpi.
+ c:\gs\ljet4l.rsp would contain:
+  -Ic:\gs\gs7.03\lib;c:\gs\fonts
+  -sDEVICE=ljet4
+  -r300
+  -dNOPAUSE
+  -dSAFER
+  -sPAPERSIZE=a4
+ The Ghostscript command would be
+  c:\gs\gs7.03\bin\gswin32c.exe
+ and the arguments
+  @c:\gs\ljet4l.rsp -sOutputFile="%1" -
+ Make sure you include the space and `dash` at the end of the line.
+ Failure to do this could result in Ghostscript stalling the
+ print queue.
+ Output would be
+  Copy temporary file to printer
+ and printer
+  HP LaserJet 4L
+
+ All other settings should be the same as the previous example.
+3PDF writer
+?PDF writer
+ PostScript written to a RedMon port can be converted to a
+ PDF file using Ghostscript.
+
+ Install a printer driver for a colour PostScript printer, e.g.
+ `Apple Color LaserWriter 12/600`.  If you select a black
+ and white printer such as `Apple LaserWriter II NT` you will
+ end up with your colour images becoming greyscale.
+
+ To use RedMon and Ghostscript to create a PDF writer, you
+ need to use the Ghostscript device pdfwrite.
+ c:\gs\pdfwrite.rsp would contain:
+  -Ic:\gs\gs7.03\lib;c:\gs\fonts
+  -sDEVICE=pdfwrite
+  -r300
+  -dNOPAUSE
+  -dSAFER
+  -sPAPERSIZE=a4
+ The Ghostscript command would be
+  c:\gs\gs7.03\bin\gswin32c.exe
+ and the arguments
+  @c:\gs\pdfwrite.rsp -sOutputFile="%1" -c .setpdfwrite -f -
+ Make sure you include the space and `dash` at the end of the line.
+ Failure to do this could result in Ghostscript stalling the
+ print queue.
+ Output should be set to
+  Prompt for filename
+
+ All other settings should be the same as the previous examples.
+
+ You may wish to rename the printer from `Apple Color LaserWriter 12/600`
+ to `Ghostscript PDF writer`.
+2Common Problems
+?Common Problems
+ If you have problems, it is recommended that you configure the
+ RedMon port to use a Log File with debugging turned on.
+
+ Before configuring RedMon, make sure that your redirection program
+ runs correctly from the command line.
+
+ `Problem:` When attempting to print, a message box titled `Printers Folder`
+ appears saying `There was an error writing to RPT1: for the printer
+ (Apple LaserWriter II NT): The system cannot write to the specified device.`
+
+ RedMon couldn't start the program you specified.
+ Look in the Log File for more details.
+
+ Make sure you have disabled bi-directional printer support.
+
+ `Problem:` Ghostscript locks up.
+
+ You might have forgotten to append a space and dash to the end of
+ the Ghostscript arguments.  This is needed to make Ghostscript read
+ from standard input.
+
+ `Problem:` Ghostscript will process some jobs, but not others.
+ If you print to FILE:, Ghostscript is able to process these jobs.
+
+ Make sure the `Spool Settings` are set to
+ `Disable bi-directional support for this printer`.
+ If this is the problem, the log file with debugging turned on will
+ include the message
+  REDMON ReadPort: You must disable bi-directional printer support
+  for this printer.
+
+ `Problem:` Attempting to configure a port gives the error message:
+ "This option is not available or not allowed".
+
+ You may need to configure the RedMon port from the computer
+ running RedMon, rather than a remote computer.
+
+ `Problem:` Windows NT lpd treats data as text instead of raw.
+
+ This isn't a problem with RedMon, but you might just need this
+ information.  When printing from Unix to NT, two common methods
+ are to use Samba to write to a RedMon port, or to use lpr to write to
+ the lpd service on NT.  The lpd service is not installed by default.
+
+ Windows NT lpd sometimes decides to treat the incoming stream as text
+ rather than raw, causing the PostScript code to be printed instead
+ of being interpreted.  This can be fixed with an appropriate command
+ option for lpr at the remote Unix box, or at the Windows NT end with
+ regedit, see:
+  http://www.jsiinc.com/TIP0400/rh0473.htm
+ Edit the registry and search for:
+  HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LPDSVC\Parameters
+ Add Value name SimulatePassThrough of type REG_DWORD and set it to 1.
+2Copyright
+?Copyright
+  Copyright (C) 1997-2000, Ghostgum Software Pty Ltd.  All rights reserved.
+
+ This file is part of RedMon.
+
+ This program is distributed with NO WARRANTY OF ANY KIND.  No author
+ or distributor accepts any responsibility for the consequences of using it,
+ or for whether it serves any particular purpose or works at all, unless he
+ or she says so in writing.  Refer to the RedMon Free Public Licence
+ (the "Licence") for full details.
+
+ Every copy of RedMon must include a copy of the Licence, normally in a
+ plain ASCII text file named LICENCE.  The Licence grants you the right
+ to copy, modify and redistribute RedMon, but only under certain conditions
+ described in the Licence.  Among other things, the Licence requires that
+ the copyright notice and this notice be preserved on all copies.
+
+     Author: Russell Lang, Ghostgum Software Pty Ltd.
+   Internet: http://www.ghostgum.com.au/

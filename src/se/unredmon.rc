@@ -1,0 +1,43 @@
+/* Copyright (C) 1997-1998, Ghostgum Software Pty Ltd.  All rights reserved.
+  
+  This file is part of RedMon.
+  
+  This program is distributed with NO WARRANTY OF ANY KIND.  No author
+  or distributor accepts any responsibility for the consequences of using it,
+  or for whether it serves any particular purpose or works at all, unless he
+  or she says so in writing.  Refer to the RedMon Free Public Licence 
+  (the "Licence") for full details.
+  
+  Every copy of RedMon must include a copy of the Licence, normally in a 
+  plain ASCII text file named LICENCE.  The Licence grants you the right 
+  to copy, modify and redistribute RedMon, but only under certain conditions 
+  described in the Licence.  Among other things, the Licence requires that 
+  the copyright notice and this notice be preserved on all copies.
+*/
+
+/* unredmon.rc */
+
+#include <windows.h>
+#include "redmonrc.h"
+#include "unredmon.h"
+
+1 ICON "binary\unredmon.ico"
+
+STRINGTABLE
+BEGIN
+	IDS_MONITORNAME, TEXT("Omdirigerad port")
+	IDS_TITLE, TEXT("RedMon - Skrivarövervakare för omdirigering av port")
+	IDS_INTRO, TEXT("Vill du ta bort skrivarövervakaren för omdirigering av port, RedMon?")
+	IDS_INUSE, TEXT("Omdirigeraren har INTE tagits bort.\
+Port %s som denna skrivarövervakare tillhandahåller används fortfarande.\
+Koppla bort alla skrivare från porten och ta sedan bort den.") 
+	IDS_ENUMPORTS_FAILED, TEXT("EnumPorts() misslyckades. Fel = %d.")
+	IDS_ENUMMONITORS_FAILED, TEXT("EnumMonitors() misslyckades. Fel = %d.")
+	IDS_NOT_INSTALLED, TEXT("RedMon är inte installerat.")
+	IDS_DELETEMONITOR_FAILED, TEXT("DeleteMonitor() misslyckades. Fel = %d.")
+	IDS_NOSYSDIR, TEXT("Hittar inte systemkatalogen. Fel = %d.")
+	IDS_ERROR_DELETE_DLL, TEXT("Kan inte ta bort skrivarövervaknings-DLL. Fel = %d.")
+	IDS_ERROR_DELETE_HELP, TEXT("Kan inte ta bort skrivarövervakarens hjälpfil. Fel = %d.")
+	IDS_UNINSTALLED, TEXT("RedMon har tagits bort.")
+END
+

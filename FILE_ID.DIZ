@@ -1,0 +1,9 @@
+RedMon - Redirection Port Monitor.
+Version 1.7.
+Redirect Windows 95/98 or NT printer
+port to standard input of a program.
+Can be used with Ghostscript to
+emulate a PostScript printer
+or a PDF writer.
+Written by Ghostgum Software Pty Ltd.
+http://www.ghostgum.com.au/

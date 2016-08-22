@@ -1,0 +1,18 @@
+LIBRARY		REDMON35
+DESCRIPTION	'Redirected Port Monitor for Windows NT 3.51'
+DATA		MULTIPLE SHARED 
+EXPORTS	
+		DllEntryPoint
+		DllMain
+		AddPortExW
+		AddPortW
+		ClosePort
+		ConfigurePortW
+		DeletePortW
+		EndDocPort
+		EnumPortsW
+		InitializeMonitor
+		OpenPort
+		ReadPort
+		StartDocPort
+		WritePort

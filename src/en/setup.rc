@@ -1,0 +1,44 @@
+/* Copyright (C) 1997-2000, Ghostgum Software Pty Ltd.  All rights reserved.
+  
+  This file is part of RedMon.
+  
+  This program is distributed with NO WARRANTY OF ANY KIND.  No author
+  or distributor accepts any responsibility for the consequences of using it,
+  or for whether it serves any particular purpose or works at all, unless he
+  or she says so in writing.  Refer to the RedMon Free Public Licence 
+  (the "Licence") for full details.
+  
+  Every copy of RedMon must include a copy of the Licence, normally in a 
+  plain ASCII text file named LICENCE.  The Licence grants you the right 
+  to copy, modify and redistribute RedMon, but only under certain conditions 
+  described in the Licence.  Among other things, the Licence requires that 
+  the copyright notice and this notice be preserved on all copies.
+*/
+
+/* setup.rc */
+
+#include <windows.h>
+#include "redmonrc.h"
+#include "setup.h"
+
+1 ICON "binary\setup.ico"
+
+STRINGTABLE
+BEGIN
+	IDS_MONITORNAME, TEXT("Redirected Port")
+	IDS_TITLE, TEXT("RedMon - Redirection Port Monitor")
+#ifdef BETA
+	IDS_BETAEXPIRED, TEXT("This BETA test version of RedMon has expired.")
+	IDS_BETAWARN, TEXT("This is a BETA test version of RedMon.  It will disable on %04d-%02d-%02d.")
+#endif
+	IDS_INTRO, TEXT("Do you want to install the RedMon redirection port monitor?")
+	IDS_ALREADY_INSTALLED, TEXT("RedMon is already installed.")
+	IDS_ENUMMONITORS_FAILED, TEXT("EnumMonitors() failed. Error = %d.")
+	IDS_NOSYSDIR, TEXT("Can't find system directory. Error = %d.")
+	IDS_ERROR_COPY_DLL, TEXT("Error copying DLL. Error = %d.")
+	IDS_ERROR_COPY_HELP, TEXT("Error copying help file. Error = %d.")
+	IDS_ERROR_COPY_UNINSTALL, TEXT("Error copying uninstall program. Error = %d.")
+	IDS_ADDMONITOR_FAILED, TEXT("AddMonitor() failed. Error = %d. ")
+	IDS_INSTALL_OK, TEXT("Installation successful.")
+END
+
