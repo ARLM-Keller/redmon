@@ -1,18 +1,15 @@
-/* Copyright (C) 1997-2001, Ghostgum Software Pty Ltd.  All rights reserved.
+/* Copyright (C) 1997-2012, Ghostgum Software Pty Ltd.  All rights reserved.
   
   This file is part of RedMon.
   
-  This program is distributed with NO WARRANTY OF ANY KIND.  No author
-  or distributor accepts any responsibility for the consequences of using it,
-  or for whether it serves any particular purpose or works at all, unless he
-  or she says so in writing.  Refer to the RedMon Free Public Licence 
-  (the "Licence") for full details.
-  
-  Every copy of RedMon must include a copy of the Licence, normally in a 
-  plain ASCII text file named LICENCE.  The Licence grants you the right 
-  to copy, modify and redistribute RedMon, but only under certain conditions 
-  described in the Licence.  Among other things, the Licence requires that 
-  the copyright notice and this notice be preserved on all copies.
+  This software is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+
+  This software is distributed under licence and may not be copied, modified
+  or distributed except as expressly authorised under the terms of the
+  LICENCE.
+
 */
 
 /* redmon.h */
@@ -26,12 +23,20 @@
 #define MONITORDLL95 TEXT("redmon95.dll")
 #define MONITORDLL35 TEXT("redmon35.dll")
 #define MONITORDLLNT TEXT("redmonnt.dll")
+#define MONITORDLL32 TEXT("redmon32.dll")
+#define MONITORDLL64 TEXT("redmon64.dll")
 #define MONITORENV95 TEXT("Windows 4.0")
 #define MONITORENVNT TEXT("Windows NT x86")
-#define MONITORHLP TEXT("redmon.hlp")
+#define MONITORENV32 TEXT("Windows NT x86")
+#define MONITORENV64 TEXT("Windows x64")
+#define MONITORHLP TEXT("redmon.chm")
 #define MONITORKEY TEXT("Redirection Port Monitor")
 
+#ifdef _WIN64
+#define UNINSTALLPROG TEXT("unredmon64.exe")
+#else
 #define UNINSTALLPROG TEXT("unredmon.exe")
+#endif
 #define UNINSTALLKEY TEXT("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall")
 #define UNINSTALLSTRINGKEY TEXT("UninstallString")
 #define DISPLAYNAMEKEY TEXT("DisplayName")

@@ -1,10 +1,10 @@
 ===============================================================
-README.TXT         2001-10-28
+README.TXT         2012-06-21
 ===============================================================
 
 RedMon - Redirection Port Monitor
-for Windows 95/98, NT 2000 and 4.0.
-Version 1.7
+for Windows 7, Vista and XP SP3.
+Version 1.9
 
 ========
 Overview
@@ -23,23 +23,24 @@ Overview
  standard input of a program.  This program is then responsible
  for processing the data and producing new output.
 
- A PostScript Windows printer redirected to a RedMon port can 
- be shared on a network.
- When this printer is configured to use Ghostscript and a non-PostScript
- printer, it appears as a PostScript printer to other network clients.
+ RedMon should only be used for local printing.  
+ Using it shared across a network has problem with the print
+ job not being owned by the user who submitted the job.
 
  RedMon can create a PDF writer using a PostScript printer driver 
  and the Ghostscript pdfwrite output device.
 
  Configuring `RedMon` is not a job for novices.
 
- RedMon supports Windows 95/98, Windows 2000 and NT 4.0.
+ Supports Windows 7, Vista and XP SP3.
+ The older RedMon 1.7 supports Windows 95/98, Windows XP SP1, 
+ Windows 2000 and NT 4.0.
 
 ============
 Installation
 ============
- To read the documentation, run 'winhelp redmon.hlp'
- To install, run 'setup.exe'
+ To read the documentation, open 'redmon.chm'
+ To install, run 'setup.exe' for 32-bit, or 'setup32.exe" for 64-bit.
 
 =================
 RedPr - RED PRint
@@ -145,31 +146,23 @@ RedFile - Redirect to File
  Any files created by RedFile might not be readable by the
  user who started the print job.
 
-============
-Translations
-============
- Thanks to Michael Basler for the German translation,
- to Cyrille Chevallet for the French translation, and 
- to Ulf Axelsson for the Swedish translation.
 
 =======================
 Copyright and Licensing
 =======================
-  Copyright (C) 1997-2001, Ghostgum Software Pty Ltd.  All rights reserved.
 
- This file is part of RedMon.
+  Copyright (C) 1997-2012, Ghostgum Software Pty Ltd.  All rights reserved.
+  
+  This file is part of RedMon.
+  
+  This software is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 
- This program is distributed with NO WARRANTY OF ANY KIND.  No author
- or distributor accepts any responsibility for the consequences of using it,
- or for whether it serves any particular purpose or works at all, unless he
- or she says so in writing.  Refer to the RedMon Free Public Licence
- (the "Licence") for full details.
+  This software is distributed under licence and may not be copied, modified
+  or distributed except as expressly authorised under the terms of the
+  LICENCE.
 
- Every copy of RedMon must include a copy of the Licence, normally in a
- plain ASCII text file named LICENCE.  The Licence grants you the right
- to copy, modify and redistribute RedMon, but only under certain conditions
- described in the Licence.  Among other things, the Licence requires that
- the copyright notice and this notice be preserved on all copies.
 
      Author: Russell Lang, Ghostgum Software Pty Ltd
    Internet: http://www.ghostgum.com.au/

@@ -1,27 +1,46 @@
-/* Copyright (C) 1997-2001, Ghostgum Software Pty Ltd.  All rights reserved.
+/* Copyright (C) 1997-2012, Ghostgum Software Pty Ltd.  All rights reserved.
   
   This file is part of RedMon.
   
-  This program is distributed with NO WARRANTY OF ANY KIND.  No author
-  or distributor accepts any responsibility for the consequences of using it,
-  or for whether it serves any particular purpose or works at all, unless he
-  or she says so in writing.  Refer to the RedMon Free Public Licence 
-  (the "Licence") for full details.
-  
-  Every copy of RedMon must include a copy of the Licence, normally in a 
-  plain ASCII text file named LICENCE.  The Licence grants you the right 
-  to copy, modify and redistribute RedMon, but only under certain conditions 
-  described in the Licence.  Among other things, the Licence requires that 
-  the copyright notice and this notice be preserved on all copies.
+  This software is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+
+  This software is distributed under licence and may not be copied, modified
+  or distributed except as expressly authorised under the terms of the
+  LICENCE.
+
 */
 
 /* portmon.h */
 
-#define MAXSTR 256
+#define MAXSTR 512
 
 #ifndef __BORLANDC__
 #define _export
 #endif
+#ifdef _MSC_VER
+#define PORTMONEXPORT __declspec(dllexport)
+#endif
+
+#ifdef _WIN64
+# define DLGRETURN INT_PTR
+# define HOOKRETURN UINT_PTR
+# define REDLONGPTR LONG_PTR
+#else
+# define DLGRETURN BOOL
+# define HOOKRETURN UINT
+# ifdef GWLP_USERDATA
+#  define REDLONGPTR LONG_PTR
+# else
+#  define REDLONGPTR LONG
+#  define GWLP_USERDATA GWL_USERDATA
+#  define GetWindowLongPtr GetWindowLong
+#  define SetWindowLongPtr SetWindowLong
+#  define SetWindowLongPtr SetWindowLong
+# endif
+#endif
+
 
 typedef struct redata_s REDATA;
 typedef struct reconfig_s RECONFIG;
@@ -81,9 +100,9 @@ LPTSTR redmon_init_config(RECONFIG *config);
 
 /* Add Port and Configure Port dialogs */
 /* WM_INITDIALOG lParam is a pointer to RECONFIG */
-BOOL CALLBACK AddDlgProc(HWND hDlg, UINT message, 
+DLGRETURN CALLBACK AddDlgProc(HWND hDlg, UINT message, 
         WPARAM wParam, LPARAM lParam);
-BOOL CALLBACK ConfigDlgProc(HWND hDlg, UINT message, 
+DLGRETURN CALLBACK ConfigDlgProc(HWND hDlg, UINT message, 
 	WPARAM wParam, LPARAM lParam);
 
 BOOL redmon_suggest_portname(TCHAR *portname, int len, int nAttempt);
@@ -102,9 +121,81 @@ BOOL redmon_end_doc_port(REDATA *prd);
 BOOL redmon_set_port_timeouts(REDATA *prd, LPCOMMTIMEOUTS lpCTO, 
 	DWORD reserved);
 
-/***********************************************************************/
-/* Stuff to allow compilation without the latest compiler or DDK */
+#ifdef UNICODE
+/* The biggest difference between NT and 95 is that NT uses wide characters
+ * (Unicode) for strings, while 95 uses ANSI characters (single byte).
+ */
+#ifdef NT35
+/* Windows NT 3.51 exports separate procedures */
+#define rAddPortEx	_export AddPortExW
+#define rAddPort	_export AddPortW
+#define rClosePort	_export ClosePort
+#define rConfigurePort	_export ConfigurePortW
+#define rDeletePort	_export DeletePortW
+#define rEndDocPort	_export EndDocPort
+#define rEnumPorts	_export EnumPortsW
+#define rOpenPort	_export OpenPort
+#define rReadPort	_export ReadPort
+#define rStartDocPort	_export StartDocPort
+#define rWritePort	_export WritePort
+PORTMONEXPORT BOOL WINAPI _export InitializeMonitor(LPWSTR pRegistryRoot);
+#endif /* NT35 */
+#endif /* UNICODE */
 
+
+
+#ifdef UNICODE
+/*
+#include <winsplp.h>
+*/
+#else
+/* Windows 95 structure */
+/* The MONITOR structure is returned by InitializeMonitorEx() */
+typedef struct _MONITOR {
+     BOOL (WINAPI *pfnEnumPorts)(LPTSTR pName,DWORD Level,LPBYTE  pPorts, 
+         DWORD cbBuf, LPDWORD pcbNeeded, LPDWORD pcReturned);
+    BOOL (WINAPI *pfnOpenPort)(LPTSTR  pName,PHANDLE pHandle);
+    BOOL (WINAPI *pfnOpenPortEx)(LPTSTR  pPortName, 
+        LPTSTR  pPrinterName, PHANDLE pHandle, struct _MONITOR 
+        FAR *pMonitor);
+    BOOL (WINAPI *pfnStartDocPort)(HANDLE  hPort, LPTSTR  pPrinterName, 
+        DWORD   JobId, DWORD   Level, LPBYTE  pDocInfo);
+    BOOL (WINAPI *pfnWritePort)(HANDLE  hPort, LPBYTE  pBuffer, 
+        DWORD   cbBuf, LPDWORD pcbWritten);
+    BOOL (WINAPI *pfnReadPort)(HANDLE hPort, LPBYTE pBuffer, 
+        DWORD  cbBuffer, LPDWORD pcbRead);
+    BOOL (WINAPI *pfnEndDocPort)(HANDLE   hPort);
+    BOOL (WINAPI *pfnClosePort)(HANDLE  hPort);
+    BOOL (WINAPI *pfnAddPort)(LPTSTR   pName, HWND    hWnd, 
+        LPTSTR   pMonitorName);
+    BOOL (WINAPI *pfnConfigurePort)(LPTSTR   pName, HWND  hWnd, 
+        LPTSTR pPortName);
+    BOOL (WINAPI *pfnDeletePort)(LPTSTR   pName, HWND    hWnd, 
+        LPTSTR   pPortName);
+    BOOL (WINAPI *pfnGetPrinterDataFromPort)(HANDLE hPort, 
+        DWORD ControlID, LPTSTR  pValueName, LPTSTR  lpInBuffer, 
+        DWORD   cbInBuffer, LPTSTR  lpOutBuffer, DWORD   cbOutBuffer, 
+        LPDWORD lpcbReturned);
+    BOOL (WINAPI *pfnSetPortTimeOuts)(HANDLE  hPort, 
+        LPCOMMTIMEOUTS lpCTO, DWORD reserved); 
+} MONITOR, FAR *LPMONITOR;
+
+/* InitializeMonitorEx is exported by the Port or Language
+ * Monitor DLL.
+ */
+PORTMONEXPORT BOOL WINAPI _export InitializeMonitorEx(
+    LPTSTR     pRegisterRoot,
+    LPMONITOR  pMonitor
+);
+#endif /* !UNICODE */
+
+#ifndef _WINSPLP_
+/***********************************************************************/
+/* If you don't have the latest DDK, you may need to comment out the
+ * include above and allow the following definitions to be used.
+ */
+
+#ifdef UNICODE
 #ifndef PORT_TYPE_WRITE
 /* PORT_INFO_2 isn't defined in BC++ 4.5 include files */
 
@@ -131,14 +222,14 @@ typedef LPPORT_INFO_2W LPPORT_INFO_2;
 typedef PORT_INFO_2A PORT_INFO_2; 
 typedef PPORT_INFO_2A PPORT_INFO_2; 
 typedef LPPORT_INFO_2A LPPORT_INFO_2; 
-#endif // UNICODE 
+#endif /* UNICODE */
  
 #define PORT_TYPE_WRITE         0x0001 
 #define PORT_TYPE_READ          0x0002 
 #define PORT_TYPE_REDIRECTED    0x0004 
 #define PORT_TYPE_NET_ATTACHED  0x0008 
  
-#endif
+#endif /* PORT_TYPE_WRITE */
 
 #ifndef DI_CHANNEL
 /* DI_CHANNEL is used by DOC_INFO_2 */
@@ -164,10 +255,10 @@ typedef LPDOC_INFO_2W LPDOC_INFO_2;
 typedef DOC_INFO_2A DOC_INFO_2;
 typedef PDOC_INFO_2A PDOC_INFO_2;
 typedef LPDOC_INFO_2A LPDOC_INFO_2;
-#endif // UNICODE
+#endif /* UNICODE */
 
-#define DI_CHANNEL              1    // start direct read/write channel,
-#endif // !defined(DI_CHANNEL)
+#define DI_CHANNEL              1    /* start direct read/write channel, */
+#endif /* !defined(DI_CHANNEL) */
 
 #ifndef DI_MEMORYMAP_WRITE
 /* DI_MEMORYMAP_WRITE is used by DOC_INFO_3 */
@@ -191,35 +282,15 @@ typedef LPDOC_INFO_3W LPDOC_INFO_3;
 typedef DOC_INFO_3A DOC_INFO_3;
 typedef PDOC_INFO_3A PDOC_INFO_3;
 typedef LPDOC_INFO_3A LPDOC_INFO_3;
-#endif // UNICODE
+#endif /* UNICODE */
 
 // Tell StartDocPrinter to not use AddJob and ScheduleJob for local printing
-#define DI_MEMORYMAP_WRITE          0  // Unknown value - don't have header 
-#endif // !defined(DI_CHANNEL)
+#define DI_MEMORYMAP_WRITE          0  /* Unknown value - don't have header */
+#endif /* !defined(DI_MEMORYMAP_WRITE) */
 
 /* From winsplp.h */
-HANDLE RevertToPrinterSelf(VOID);
-BOOL ImpersonatePrinterClient(HANDLE  hToken);
-
-#ifdef UNICODE
-/* The biggest difference between NT and 95 is that NT uses wide characters
- * (Unicode) for strings, while 95 uses ANSI characters (single byte).
- */
-#ifdef NT35
-/* Windows NT 3.51 exports separate procedures */
-#define rAddPortEx	_export AddPortExW
-#define rAddPort	_export AddPortW
-#define rClosePort	_export ClosePort
-#define rConfigurePort	_export ConfigurePortW
-#define rDeletePort	_export DeletePortW
-#define rEndDocPort	_export EndDocPort
-#define rEnumPorts	_export EnumPortsW
-#define rOpenPort	_export OpenPort
-#define rReadPort	_export ReadPort
-#define rStartDocPort	_export StartDocPort
-#define rWritePort	_export WritePort
-BOOL WINAPI _export InitializeMonitor(LPWSTR pRegistryRoot);
-#endif /* NT40 */
+HANDLE WINAPI RevertToPrinterSelf(VOID);
+BOOL WINAPI ImpersonatePrinterClient(HANDLE  hToken);
 
 
 #ifdef NT40
@@ -257,11 +328,12 @@ typedef struct _MONITOREX {
         MONITOR  Monitor;
 } MONITOREX, FAR *LPMONITOREX;
 
-LPMONITOREX WINAPI _export InitializePrintMonitor(LPWSTR pRegistryRoot);
+PORTMONEXPORT LPMONITOREX WINAPI _export InitializePrintMonitor(LPWSTR pRegistryRoot);
 #endif /* NT40 */
 
 #ifdef NT50
 /* Windows 2000 (NT5) structures and functions */
+#ifndef BIDI_ACTION_ENUM_SCHEMA
 typedef struct _BINARY_CONTAINER {
   DWORD  cbBuf;
   LPBYTE  pData;
@@ -303,6 +375,7 @@ typedef struct _BIDI_RESPONSE_CONTAINER {
   DWORD  Count;
   BIDI_RESPONSE_DATA aData[1];
 } BIDI_RESPONSE_CONTAINER, *PBIDI_RESPONSE_CONTAINER, *LPBIDI_RESPONSE_CONTAINER; 
+#endif
 
 /* MONITOR2 structure is returned by InitializePrintMonitor2 */
 typedef struct _MONITOR2 
@@ -494,56 +567,18 @@ typedef struct _MONITORUI
 	PCWSTR pszPortName); 
 } MONITORUI, FAR *PMONITORUI; 
 
-LPMONITOR2 WINAPI 
+PORTMONEXPORT LPMONITOR2 WINAPI _export
     InitializePrintMonitor2( 
 	PMONITORINIT pMonitorInit, 
 	PHANDLE phMonitor 
 	); 
 
-PMONITORUI WINAPI 
+PORTMONEXPORT PMONITORUI WINAPI _export
     InitializePrintMonitorUI(VOID); 
 #endif /* NT50 */
 
-#else   /* !UNICODE */
-/* Windows 95 structure */
-/* The MONITOR structure is returned by InitializeMonitorEx() */
-typedef struct _MONITOR {
-     BOOL (WINAPI *pfnEnumPorts)(LPTSTR pName,DWORD Level,LPBYTE  pPorts, 
-         DWORD cbBuf, LPDWORD pcbNeeded, LPDWORD pcReturned);
-    BOOL (WINAPI *pfnOpenPort)(LPTSTR  pName,PHANDLE pHandle);
-    BOOL (WINAPI *pfnOpenPortEx)(LPTSTR  pPortName, 
-        LPTSTR  pPrinterName, PHANDLE pHandle, struct _MONITOR 
-        FAR *pMonitor);
-    BOOL (WINAPI *pfnStartDocPort)(HANDLE  hPort, LPTSTR  pPrinterName, 
-        DWORD   JobId, DWORD   Level, LPBYTE  pDocInfo);
-    BOOL (WINAPI *pfnWritePort)(HANDLE  hPort, LPBYTE  pBuffer, 
-        DWORD   cbBuf, LPDWORD pcbWritten);
-    BOOL (WINAPI *pfnReadPort)(HANDLE hPort, LPBYTE pBuffer, 
-        DWORD  cbBuffer, LPDWORD pcbRead);
-    BOOL (WINAPI *pfnEndDocPort)(HANDLE   hPort);
-    BOOL (WINAPI *pfnClosePort)(HANDLE  hPort);
-    BOOL (WINAPI *pfnAddPort)(LPTSTR   pName, HWND    hWnd, 
-        LPTSTR   pMonitorName);
-    BOOL (WINAPI *pfnConfigurePort)(LPTSTR   pName, HWND  hWnd, 
-        LPTSTR pPortName);
-    BOOL (WINAPI *pfnDeletePort)(LPTSTR   pName, HWND    hWnd, 
-        LPTSTR   pPortName);
-    BOOL (WINAPI *pfnGetPrinterDataFromPort)(HANDLE hPort, 
-        DWORD ControlID, LPTSTR  pValueName, LPTSTR  lpInBuffer, 
-        DWORD   cbInBuffer, LPTSTR  lpOutBuffer, DWORD   cbOutBuffer, 
-        LPDWORD lpcbReturned);
-    BOOL (WINAPI *pfnSetPortTimeOuts)(HANDLE  hPort, 
-        LPCOMMTIMEOUTS lpCTO, DWORD reserved); 
-} MONITOR, FAR *LPMONITOR;
+#endif /* UNICODE */
 
-/* InitializeMonitorEx is exported by the Port or Language
- * Monitor DLL.
- */
-BOOL WINAPI _export InitializeMonitorEx(
-    LPTSTR     pRegisterRoot,
-    LPMONITOR  pMonitor
-);
-
-#endif /* !UNICODE */
+#endif /* !_WINSPLP_ */
 
 /* end of portmon.h */

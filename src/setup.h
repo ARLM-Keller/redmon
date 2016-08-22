@@ -1,4 +1,4 @@
-/* Copyright (C) 1997-1998, Ghostgum Software Pty Ltd.  All rights reserved.
+/* Copyright (C) 1997-2005, Ghostgum Software Pty Ltd.  All rights reserved.
   
   This file is part of RedMon.
   
