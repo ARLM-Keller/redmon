@@ -1,12 +1,13 @@
 README.TXT
 LICENCE
 FILE_ID.DIZ
-redmon.hlp
-redmon35.dll
-redmon95.dll
-redmonnt.dll
+redmon.chm
+redmon32.dll
+redmon64.dll
 setup.exe
+setup64.exe
 unredmon.exe
+unredmon64.exe
 redpr.exe
 redrun.exe
 redfile.exe

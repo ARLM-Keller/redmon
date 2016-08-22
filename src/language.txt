@@ -1,23 +1,23 @@
 To translate RedMon into another language, you need to
 translate the files in the "en" (english) subdirectory: 
   redmon.txt
-  redmon.hpj
   redmon.rc
   setup.rc
   unredmon.rc
-You will also need to do some screen captures from Windows 95
-and Windows NT.  To capture the dialog boxes, display the relevant
+
+If you include images of dialog boxes, you will need to do some screen 
+captures from Windows.  To capture the dialog boxes, display the relevant
 window then press Alt+PrintScreen.  This copies a bitmap of the window
 to the clipboard.  To save this to a file, use GSview "Edit | Paste To".
-These bitmaps must use small fonts and 16 colours.
+These bitmaps must use GIF format unless doc2hhp and doc2html are changed.
 
 Put all translated files in a sub-directory named after the language.
 
 Do not translate text strings within the .c or .h files.  
 These are debugging messages that the author might want to read.
 
-The file redmon.txt is converted by doc2rtf to redmon.rtf, then by
-the help compiler to redmon.hlp.
+The file redmon.txt is converted by doc2hhp to html files,
+then by the HTML help comiler to redmon.chm
 The format of redmon.txt is as follows:
 - The help file is a plain text file using the ISO-Latin1 character set.
 - The first line is used as the title for HTML pages derived from
@@ -36,4 +36,4 @@ The format of redmon.txt is as follows:
 - Don't put spaces at the ends of lines.  These mess up the formatting.
 
 Russell Lang, Ghostgum Software Pty Ltd
-1998-12-05
+2012-06-21

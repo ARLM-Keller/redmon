@@ -1,5 +1,93 @@
 =======================
-2000-10-28  Version 1.7
+2012-06-21  Version 1.9
+=======================
+
+Converted help file to HTML Help.
+
+Added 64-bit build, which is cross compiled on 32-bit Windows.  
+New files setup64.exe, unredmon64.exe and redmon64.dll.
+
+32-bit DLL is now redmon32.dll, not redmonnt.dll.
+
+Use Windows Driver Kit 7.1.0 (Windows XP and later) in
+C:\WinDDK\7600.16385.1\
+
+Compiles with MSVC++ 10 or MSVC++9.
+
+Might compile with MSVC++8 if you use an older version of 
+the Windows Driver Kit, but not the 64-bit version.
+
+Might compile with MSVC++7, but hasn't been tested recently.
+
+"Prompt for filename" dialog will now appear in the current session
+if using "Run as user", rather than the first session.  
+This works with XP and Vista, but not Windows Terminal Services.
+
+Be more careful when creating a suggested document name.
+Don't copy '?' or '*' in the document name.
+
+Added manifest to setup and uninstall programs, so they prompt for 
+Administrator access on Vista.
+
+Uninstaller now works on systems with lots of printers and ports
+Uninstaller now finds all printers using RedMon ports, attempts
+to change them to use FILE:, then deletes the RedMon ports.
+
+RedMon may still work on Windows 95, 98, ME, NT 3.5, NT 4 and 2000,
+but these have not been tested.  It won't work on Windows 95 and 98
+if compiled with MSVC++8 or later.
+
+Added REDMON_OUTPUTPRINTER environment variable.
+
+Added REDMON_BASENAME containing a sanitised version of REDMON_DOCNAME,
+removing the path and extension.  Also available as %b in the 
+program arguments.
+
+Added an API that allows a port to be added and configured.
+This is very sensitive to format.  If you put quotes in the wrong place, 
+or double quote incorrectly, then it doesn't work.
+An example of silent install and configuration of RedMon is:
+setup /s
+rundll32 redmon32.dll,RedMonConfigurePort Port="RPT1:" 
+  Command="c:\Program Files\gs\gs9.04\bin\gswin32c.exe" 
+  Arguments="-sDEVICE=pdfwrite -r300 -dNOPAUSE -dSAFER -sPAPERSIZE=a4 
+  -sOutputFile=""%%1"" -c .setpdfwrite -f -" Output=1 LogFileUse=1   
+  LogFileName="c:\redmon.txt" LogFileDebug=1 RunUser=1
+You need to have Administrator privileges to run the above.
+
+Redmon licence changed from Aladdin Free Public Licence to
+the GNU General Public Licence v3.
+
+
+Known problems:
+
+Won't run on Windows 95/98/Me and NT3.5/NT4/2000/XP SP1.
+The makefile no longer builds these, but they are still in the
+source code.  It may compile correctly with an old compiler, 
+but this hasn't been tested.
+
+On Windows Terminal Services, `Prompt for filename` and `Run as user`
+will only work when the user is logged into the console.
+The configuration dialog boxes will appear on the correct user session.
+
+If you attempt to add a new Redirected Port on Windows 7 or Vista, 
+and you forget to do it as Administrator, then you will get the 
+error messsage 
+ "Specified port cannot be added.  Operation could not be completed 
+  (error 0x00000001)."
+A similar message is displayed if you try to configure the port
+with insufficient priveleges.
+
+Prompt for filename dialog doesn't prompt when overwriting a file.
+
+Don't try to use remote printing to printer using the RedMon
+port.  It isn't going to work because the user isn't logged 
+into the remote system.
+
+Environment variables are not expanded in the program arguments.
+
+=======================
+2001-10-28  Version 1.7
 =======================
 
 Public release.
@@ -12,7 +100,7 @@ Still doesn't display "Prompt for filename" dialog on WTS client.
 To be fixed in next major release.
 
 ============================
-2000-09-30  Version 1.6 beta
+2001-09-30  Version 1.6 beta
 ============================
 
 Added environment variable REDMON_SESSIONID for Windows Terminal Server.

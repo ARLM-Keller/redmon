@@ -1,18 +1,15 @@
-/* Copyright (C) 1997-2001, Ghostgum Software Pty Ltd.  All rights reserved.
+/* Copyright (C) 1997-2012, Ghostgum Software Pty Ltd.  All rights reserved.
   
   This file is part of RedMon.
   
-  This program is distributed with NO WARRANTY OF ANY KIND.  No author
-  or distributor accepts any responsibility for the consequences of using it,
-  or for whether it serves any particular purpose or works at all, unless he
-  or she says so in writing.  Refer to the RedMon Free Public Licence 
-  (the "Licence") for full details.
-  
-  Every copy of RedMon must include a copy of the Licence, normally in a 
-  plain ASCII text file named LICENCE.  The Licence grants you the right 
-  to copy, modify and redistribute RedMon, but only under certain conditions 
-  described in the Licence.  Among other things, the Licence requires that 
-  the copyright notice and this notice be preserved on all copies.
+  This software is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+
+  This software is distributed under licence and may not be copied, modified
+  or distributed except as expressly authorised under the terms of the
+  LICENCE.
+
 */
 
 /* redmon.c */
@@ -24,7 +21,9 @@
  *   Windows 95, 98
  *   Windows NT 3.5
  *   Windows NT 4.0
- *   Windows NT 5.0 (Windows 2000 Professional) - needs more testing
+ *   Windows NT 5.0 (Windows 2000 Professional) - needs more testing (From Jonas Oberschweiber)
+ *   Windows NT 5.1 (Windows XP)
+ *   Windows NT 6.1 (Windows 7)
  *
  * The monitor name is "Redirected Port" .
  * A write to any port provided by this monitor will be
@@ -50,6 +49,8 @@
 
 #define STRICT
 #include <windows.h>
+#include <psapi.h>
+#include <userenv.h>
 #include "portmon.h"
 #include "redmon.h"
 #ifdef BETA
@@ -109,6 +110,7 @@ struct redata_s {
     TCHAR command[1024];
     TCHAR pPrinterName[MAXSTR];	/* Printer name for RedMon port */
     TCHAR pDocName[MAXSTR];	/* Document Name (from StartDocPort) */
+    TCHAR pBaseName[MAXSTR];	/* Sanitised version of Document Name */
     DWORD JobId;
     TCHAR pUserName[MAXSTR];	/* User Name (from StartDocPort job info) */
     TCHAR pMachineName[MAXSTR];	/* Machine Name (from StartDocPort job info) */
@@ -163,9 +165,9 @@ void redmon_cancel_job(REDATA *prd);
 BOOL start_redirect(REDATA * prd);
 void reset_redata(REDATA *prd);
 BOOL check_process(REDATA *prd);
-LRESULT APIENTRY GetSaveHookProc(HWND hDlg, UINT message, 
+HOOKRETURN APIENTRY GetSaveHookProc(HWND hDlg, UINT message, 
 	WPARAM wParam, LPARAM lParam);
-LRESULT CALLBACK LogfileDlgProc(HWND hDlg, UINT message, 
+DLGRETURN CALLBACK LogfileDlgProc(HWND hDlg, UINT message, 
 	WPARAM wParam, LPARAM lParam);
 int create_tempfile(LPTSTR filename, DWORD len);
 int redmon_printfile(REDATA * prd, TCHAR *filename);
@@ -176,7 +178,10 @@ BOOL redmon_write_printer(REDATA *prd, BYTE *ptr, DWORD len);
 BOOL get_job_info(REDATA *prd);
 BOOL make_env(REDATA * prd);
 BOOL query_session_id(REDATA * prd);
+void WriteLog(HANDLE hFile, LPCTSTR str);
+void WriteError(HANDLE hFile, DWORD err);
 BOOL get_filename_as_user(REDATA * prd);
+BOOL get_filename_client(REDATA * prd, OPENFILENAME *pofn);
 BOOL redmon_print_error(REDATA *prd);
 
 /* we don't rely on the import library having XcvData,
@@ -185,6 +190,7 @@ BOOL WINAPI XcvData(HANDLE hXcv, LPCWSTR pszDataName,
     PBYTE pInputData, DWORD cbInputData, 
     PBYTE pOutputData, DWORD cbOutputData, PDWORD pcbOutputNeeded,
     PDWORD pdwStatus);
+
 
 
 #define PORTSNAME TEXT("Ports")
@@ -197,9 +203,11 @@ BOOL WINAPI XcvData(HANDLE hXcv, LPCWSTR pszDataName,
 #define REDMON_PORT     TEXT("REDMON_PORT=")
 #define REDMON_JOB      TEXT("REDMON_JOB=")
 #define REDMON_PRINTER  TEXT("REDMON_PRINTER=")
+#define REDMON_OUTPUTPRINTER  TEXT("REDMON_OUTPUTPRINTER=")
 #define REDMON_MACHINE  TEXT("REDMON_MACHINE=")
 #define REDMON_USER     TEXT("REDMON_USER=")
 #define REDMON_DOCNAME  TEXT("REDMON_DOCNAME=")
+#define REDMON_BASENAME  TEXT("REDMON_BASENAME=")
 #define REDMON_FILENAME  TEXT("REDMON_FILENAME=")
 #define REDMON_SESSIONID  TEXT("REDMON_SESSIONID=")
 #define REDMON_TEMP     TEXT("TEMP=")
@@ -327,6 +335,11 @@ LPTSTR redmon_init_config(RECONFIG *config)
     config->dwVersion = VERSION_NUMBER;
     config->dwOutput = OUTPUT_SELF;
     config->dwShow = FALSE;
+#ifdef UNICODE
+    if (ntver > 500)
+        config->dwRunUser = TRUE;
+    else
+#endif
     config->dwRunUser = FALSE;
     config->dwDelay = DEFAULT_DELAY;
 #ifdef BETA
@@ -505,6 +518,335 @@ syslog(TEXT("\r\n"));
     return TRUE;
 }
 
+int redmon_toi(LPCTSTR str)
+{
+    int value = 0;
+    LPCTSTR p = str;
+    while (*p && (*p >= '0') && (*p <= '9')) {
+	value = value * 10 + ((*p)-48);
+	p++;
+    }
+    return value;
+}
+
+HANDLE redmon_to_handle(LPCTSTR str)
+{
+    uintptr_t value = 0;
+    LPCTSTR p = str;
+    while (*p && (*p >= '0') && (*p <= '9')) {
+	value = value * 10 + ((*p)-48);
+	p++;
+    }
+    return (HANDLE)value;
+}
+
+BOOL redmon_setvalue(RECONFIG *pconfig, LPCTSTR key, LPCTSTR value)
+{
+    BOOL flag = TRUE;
+    if (lstrcmp(key, TEXT("Port"))==0) {
+	/* Do nothing here, we called GetConfig */
+    }
+    else if (lstrcmp(key, DESCKEY)==0) {
+	lstrcpyn(pconfig->szDescription, value,
+	    sizeof(pconfig->szDescription)/sizeof(TCHAR)-1);
+    }
+    else if (lstrcmp(key, COMMANDKEY)==0) {
+	lstrcpyn(pconfig->szCommand, value,
+	    sizeof(pconfig->szCommand)/sizeof(TCHAR)-1);
+    }
+    else if (lstrcmp(key, ARGKEY)==0) {
+	lstrcpyn(pconfig->szArguments, value,
+	    sizeof(pconfig->szArguments)/sizeof(TCHAR)-1);
+    }
+    else if (lstrcmp(key, PRINTERKEY)==0) {
+	lstrcpyn(pconfig->szPrinter, value,
+	    sizeof(pconfig->szPrinter)/sizeof(TCHAR)-1);
+    }
+    else if (lstrcmp(key, OUTPUTKEY)==0) {
+	pconfig->dwOutput = redmon_toi(value);
+    }
+    else if (lstrcmp(key, SHOWKEY)==0) {
+	pconfig->dwShow = redmon_toi(value);
+    }
+    else if (lstrcmp(key, RUNUSERKEY)==0) {
+	pconfig->dwRunUser = redmon_toi(value);
+    }
+    else if (lstrcmp(key, DELAYKEY)==0) {
+	pconfig->dwDelay = redmon_toi(value);
+    }
+    else if (lstrcmp(key, LOGUSEKEY)==0) {
+	pconfig->dwLogFileUse = redmon_toi(value);
+    }
+    else if (lstrcmp(key, LOGNAMEKEY)==0) {
+	lstrcpyn(pconfig->szLogFileName, value,
+	    sizeof(pconfig->szLogFileName)/sizeof(TCHAR)-1);
+    }
+    else if (lstrcmp(key, LOGDEBUGKEY)==0) {
+	pconfig->dwLogFileDebug = redmon_toi(value);
+    }
+    else if (lstrcmp(key, PRINTERRORKEY)==0) {
+	pconfig->dwPrintError = redmon_toi(value);
+    }
+    else
+	flag = FALSE;
+    return flag;
+}
+
+static TCHAR XcvPort[] = TEXT("XcvPort");
+
+/* Exported API for configuring a port.
+/*
+ * Port must already exist.  
+ * rundll32 redmon.dll,RedMonConfigurePort Port="RPT1"
+ *   Command="c:\gs\gs8.11\bin\gswin32c"
+ *   Arguments="""@c:\gs\gs8.11\pdfwrite.txt"" -sOutputFile=""%1"" -"
+ */
+#ifdef UNICODE
+__declspec(dllexport) void CALLBACK RedMonConfigurePortW(
+#else
+__declspec(dllexport) void CALLBACK RedMonConfigurePort(
+#endif
+  HWND hwnd,
+  HINSTANCE hinst,
+  LPTSTR lpCmdLine,
+  int nCmdShow
+) 
+{
+    TCHAR buf[MAXSTR];
+    LPCTSTR p;
+    TCHAR key[MAXSTR];
+    TCHAR value[MAXSTR];
+    int ck;
+    int cv;
+    BOOL setconfig = FALSE;
+
+    DWORD config_len = redmon_sizeof_config();
+    HGLOBAL hglobal = GlobalAlloc(GPTR, config_len);
+    RECONFIG *pconfig = GlobalLock(hglobal);
+    DWORD dwOutput = 0;
+    DWORD dwNeeded = 0;
+    DWORD dwError = ERROR_SUCCESS;
+    DWORD dwStatus;
+    BOOL flag;
+
+    TCHAR pszServerName[MAXSTR];
+    HANDLE hXcv = NULL;
+    PRINTER_DEFAULTS pd;
+#ifdef DEBUG_REDMON
+    HANDLE hFile;
+
+    hFile = CreateFile(TEXT("c:\\temp\\log.txt"),
+	GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+#endif
+
+#ifdef DEBUG_REDMON
+#ifdef UNICODE
+    WriteLog(hFile, TEXT("RedMonConfigurePortW\r\n"));
+#else
+    WriteLog(hFile, TEXT("RedMonConfigurePort\r\n"));
+#endif
+    WriteLog(hFile, TEXT("lpCmdLine="));
+    WriteLog(hFile, lpCmdLine);
+    WriteLog(hFile, TEXT("\r\n"));
+#endif
+
+    redmon_init_config(pconfig);
+    pd.pDatatype = NULL;
+    pd.pDevMode = NULL;
+    pd.DesiredAccess = SERVER_ACCESS_ADMINISTER;
+
+    /* Parse the command line */
+    p = lpCmdLine;
+    while (*p) {
+	while (*p && (*p==' '))
+	    p++;	/* skip spaces */
+
+	/* copy key name */
+	ck = 0;
+	while (*p && (*p!='=')) {
+	    if (ck < sizeof(key)/sizeof(TCHAR)-1)
+		key[ck++] = *p;
+	    p++;
+	}
+	key[ck] = '\0';
+	if (*p)
+	    p++;	/* skip '=' */
+
+	/* copy value */
+	cv = 0;
+	if (*p == '\042') {
+	    /* quoted, copy till next quote */
+	    p++;
+	    while (*p && !((*p=='\042') && (*(p+1)!='\042')) ) {
+		if (*p && (*p=='\042') && *(p+1) && (*(p+1)=='\042')) {
+		    /* embedded quote */
+		    p++;
+		}
+		if (cv < sizeof(value)/sizeof(TCHAR)-1)
+		    value[cv++] = *p;
+		p++;
+	    }
+	    p++;
+	}
+	else {
+	    /* unquoted, skip till space */
+	    while (*p && (*p!=' ')) {
+		if (cv < sizeof(value)/sizeof(TCHAR)-1)
+		    value[cv++] = *p;
+		p++;	/* skip spaces */
+	    }
+	}
+	value[cv] = '\0';
+
+#ifdef DEBUG_REDMON
+	if (key[0] && value[0]) {
+	    WriteLog(hFile, TEXT("key=\042"));
+	    WriteLog(hFile, key);
+	    WriteLog(hFile, TEXT("\042 value=\042"));
+	    WriteLog(hFile, value);
+	    WriteLog(hFile, TEXT("\042\r\n"));
+	    /* parse the config */
+	}
+#endif
+
+	if (lstrcmp(key, TEXT("Port"))==0) {
+	    /* get current configuration */
+	    LPCTSTR pszPortName = value;
+
+#ifdef UNICODE
+	    /* Create port if it doesn't already exist */
+	    lstrcpy(pszServerName, TEXT(",XcvMonitor Redirected Port"));
+	    if (!OpenPrinter(pszServerName, &hXcv, &pd)) {
+		dwError = GetLastError();
+#ifdef DEBUG_REDMON
+		WriteLog(hFile, TEXT("Failed to open printer \042"));
+		WriteLog(hFile, pszServerName);
+		WriteLog(hFile, TEXT("\042\r\n"));
+		WriteError(hFile, dwError);
+#endif
+		hXcv = NULL;
+	    }
+	    else {
+		/* Check if port exists */
+		dwStatus = ERROR_SUCCESS;
+		if (!XcvData(hXcv, TEXT("PortExists"), (PBYTE)pszPortName, 
+			sizeof(TCHAR)*(lstrlen(pszPortName)+1),
+			(PBYTE)(&dwOutput), 0, &dwNeeded, &dwStatus))
+		    dwStatus = GetLastError();
+		/* If not ERROR_PRINTER_ALREADY_EXISTS */
+		/* then add the port */
+		if (dwStatus == ERROR_SUCCESS) {
+		    if (!XcvData(hXcv, L"AddPort", (PBYTE)pszPortName, 
+			    sizeof(WCHAR)*(lstrlenW(pszPortName)+1),
+			    (PBYTE)(&dwOutput), 0, &dwNeeded, &dwStatus)) {
+			dwError = GetLastError();
+#ifdef DEBUG_REDMON
+			WriteError(hFile, dwError);
+#endif
+		    }
+		}
+		ClosePrinter(hXcv);
+	    }
+#endif
+
+
+#ifdef DEBUG_REDMON
+	    WriteLog(hFile, TEXT("GetConfig "));
+	    WriteLog(hFile, pszPortName);
+	    WriteLog(hFile, TEXT("\r\n"));
+#endif
+#ifdef UNICODE
+	    /* Now use OpenPrinter and XcvData to get/set it */
+	    if (!MakeXcvName(pszServerName, NULL, XcvPort, pszPortName)) {
+#ifdef DEBUG_REDMON
+		WriteLog(hFile, TEXT("Failed to make Xcv Name\r\n"));
+#endif
+		break;
+	    }
+
+#ifdef DEBUG_REDMON
+	    WriteLog(hFile, TEXT("OpenPrinter "));
+	    WriteLog(hFile, pszServerName);
+	    WriteLog(hFile, TEXT("\r\n"));
+#endif
+	    if (!OpenPrinter(pszServerName, &hXcv, &pd)) {
+		dwError = GetLastError();
+#ifdef DEBUG_REDMON
+		WriteError(hFile, dwError);
+#endif
+		hXcv = NULL;
+	    }
+
+	    if (hXcv) {
+		if (!XcvData(hXcv, TEXT("GetConfig"), (PBYTE)pszPortName, 
+		    sizeof(TCHAR)*(lstrlen(pszPortName)+1),
+		    (PBYTE)pconfig, config_len, &dwNeeded, &dwError)) {
+		    dwError = GetLastError();
+#ifdef DEBUG_REDMON
+		    WriteError(hFile, dwError);
+#endif
+		}
+	    }
+	    else {
+		lstrcpyn(pconfig->szPortName, value, 
+		    sizeof(pconfig->szPortName)/sizeof(TCHAR)-1);
+	    }
+#else
+#ifdef DEBUG_REDMON
+	    WriteLog(hFile, "Not implemented for Windows 95/98/Me\r\n");
+#endif
+#endif
+	}
+	else {
+	    setconfig = TRUE;
+	    if (!redmon_setvalue(pconfig, key, value)) {
+#ifdef DEBUG_REDMON
+	        WriteLog(hFile, TEXT("Unknown key=\042"));
+		WriteLog(hFile, key);
+		WriteLog(hFile, TEXT("\042 value=\042"));
+		WriteLog(hFile, value);
+		WriteLog(hFile, TEXT("\042\r\n"));
+#endif
+	    }
+	}
+
+    }
+
+    if (setconfig && pconfig->szPortName[0]) {
+#ifdef UNICODE
+#ifdef DEBUG_REDMON
+	WriteLog(hFile, TEXT("SetConfig "));
+	WriteLog(hFile, pconfig->szPortName);
+	WriteLog(hFile, TEXT("\r\n"));
+#endif
+	if (hXcv) {
+	    if (!XcvData(hXcv, TEXT("SetConfig"), 
+		(PBYTE)pconfig, config_len, 
+		(PBYTE)(&dwOutput), 0, &dwNeeded, &dwError)) {
+		dwError = GetLastError();
+#ifdef DEBUG_REDMON
+		WriteError(hFile, dwError);
+#endif
+	    }
+	}
+#else
+#ifdef DEBUG_REDMON
+	WriteLog(hFile, "Not implemented for Windows 95/98/Me\r\n");
+#endif
+#endif
+    }
+#ifdef DEBUG_REDMON
+	CloseHandle(hFile);
+#endif
+
+    if (hXcv)
+	ClosePrinter(hXcv);
+
+    GlobalUnlock(hglobal);
+    GlobalFree(hglobal);
+}
+
+
 void
 reset_redata(REDATA *prd)
 {
@@ -544,6 +886,7 @@ reset_redata(REDATA *prd)
     prd->tempname[0] = '\0';
     prd->printer = INVALID_HANDLE_VALUE;
     prd->printer_bytes = 0;
+    prd->primary_token = NULL;
 }
 
 /* copy stdout and stderr to log file, if open */
@@ -872,7 +1215,6 @@ BOOL GetSid(LPTSTR pszSidText, LPDWORD dwSidTextLen)
     return flag;
 }
 
-
 /* When using "Prompt for filename", suggest previous name used by user.
  * The previous filename is stored in the user registry.  
  * Since we are running as the Local System account and the 
@@ -1115,6 +1457,7 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
 {
     TCHAR buf[MAXSTR];
     int i;
+    int j, pathsep;
     LPTSTR s;
     BOOL flag;
 #ifndef UNICODE
@@ -1198,6 +1541,26 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
     }
     else
 	lstrcpy(prd->pDocName, TEXT("RedMon"));
+
+    /* Sanitise pDocName */
+    pathsep = 0; 
+    for (i=0; prd->pDocName[i] != '\0'; i++) {
+	if ( (prd->pDocName[i] == '\\') || (prd->pDocName[i] == '/') )
+	    pathsep = i+1;
+    }
+    j = 0;
+    for (s = prd->pDocName + pathsep; *s; s++) {
+	if ((*s != '<') && (*s != '>') && (*s != '\"') &&
+	    (*s != '|') && (*s != '/') && (*s != '\\') &&
+	    (*s != '?') && (*s != '*') && (*s != ':')) {
+		if (*s == '.')
+		    break;
+		prd->pBaseName[j] = *s; 
+		if (j < sizeof(prd->pBaseName) - 1)
+		    j++;
+	}
+    }
+    prd->pBaseName[j] = '\0';
 
     /* Get user name and machine name from job info */
     get_job_info(prd);
@@ -1299,7 +1662,6 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
     }
 
     query_session_id(prd);
-    make_env(prd);
 
     /* Prompt for output filename, to be passed as %1 */
     if (prd->config.dwOutput == OUTPUT_PROMPT) {
@@ -1339,7 +1701,7 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
 	    ofn.lpstrFile = prd->tempname;
 	    ofn.nMaxFile = sizeof(prd->tempname);
 	    ofn.lpfnHook = GetSaveHookProc;	/* to bring to foreground */
-	    ofn.Flags = OFN_ENABLEHOOK | OFN_EXPLORER;
+	    ofn.Flags = OFN_ENABLEHOOK | OFN_EXPLORER | OFN_OVERWRITEPROMPT;
 	    if (LoadString(hdll, IDS_FILTER_PROMPT, szFilter, 
 		sizeof(szFilter)/sizeof(TCHAR) -1 )) {
 		cReplace = szFilter[lstrlen(szFilter)-1];
@@ -1362,26 +1724,43 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
 #else
 	    get_last_filename(prd);
 #endif
-	    if (lstrlen(ofn.lpstrFile)) {
-		lstrcpy(szDir, ofn.lpstrFile);
-		for (i=lstrlen(szDir)-1; i; i--) {
-		    if (szDir[i] == '\\') {
-			lstrcpy(ofn.lpstrFile, szDir+i+1);
-			szDir[i+1] = '\0';
-			ofn.lpstrInitialDir = szDir;
-			break;
+
+#if defined(UNICODE) && (defined(NT40) || defined(NT50))
+	    if (!prd->config.dwRunUser)
+#endif
+	    {
+		/* Split the directory name and filename */
+		if (lstrlen(ofn.lpstrFile)) {
+		    lstrcpy(szDir, ofn.lpstrFile);
+		    for (i=lstrlen(szDir)-1; i; i--) {
+			if (szDir[i] == '\\') {
+			    lstrcpy(ofn.lpstrFile, szDir+i+1);
+			    szDir[i+1] = '\0';
+			    ofn.lpstrInitialDir = szDir;
+			    break;
+			}
 		    }
 		}
 	    }
-#ifdef NOTUSED /* This code doesn't work yet */
+
 #if defined(UNICODE) && (defined(NT40) || defined(NT50))
+#ifdef NOTUSED
 	    if (prd->pSessionId && 
-		!((prd->pSessionId[0] = '0') && (prd->pSessionId[1] == '\0')))
-		flag = get_filename_as_user(prd);/* WTS uses separate process*/
+		!((prd->pSessionId[0] == '0') && (prd->pSessionId[1] == '\0')))
+#endif
+	    if (prd->config.dwRunUser) {
+		write_string_to_log(prd, 
+		   TEXT("\r\nget_filename_as_user sent: "));
+		write_string_to_log(prd, prd->tempname);
+		write_string_to_log(prd, 
+		   TEXT("\r\n"));
+		flag = get_filename_as_user(prd); /* WTS uses separate process*/
+	    }
 	    else
-#endif
-#endif
+		flag = get_filename_client(prd, &ofn);
+#else
 	    flag = GetSaveFileName(&ofn);
+#endif
 
 	    if (flag) {
 #if REDMON_DEBUG
@@ -1398,9 +1777,19 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
 	    }
 	    else  {
 		redmon_cancel_job(prd);
+		/* User cancelled at the filename prompt.
+		 * Keep going, because returning an error causes
+		 * the print spooler to retry and call the
+		 * the port monitor again and again.
+		 */
+		prd->error = TRUE;	/* Don't process job */
+					/* Job will be cancelled in WritePort */
 		write_string_to_log(prd, 
-	      TEXT("\r\nREDMON StartDocPort: prompt for filename failed\r\n"));
+    TEXT("\r\nREDMON StartDocPort: prompt for filename failed.\r\n"));
+		write_string_to_log(prd, 
+    TEXT("  The print job will be silently consumed and thrown away.\r\n"));
 	        SetLastError(ERROR_CANCELLED);
+		return TRUE;
 	    }
 	}
     }
@@ -1421,6 +1810,8 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
 	return FALSE;
     }
 
+    make_env(prd);
+
     /* Launch application */
 
     /* Build command line */
@@ -1429,7 +1820,9 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
     lstrcat(prd->command, TEXT("\042 "));
 
     /* copy arguments, substituting %1 for temp or prompted filename, */
-    /* %h for printer pipe handle,  %d for document name, %u for the user */
+    /* %h for printer pipe handle,  %d for document name, %u for the user, */
+    /* %b for document base name (no path and no extension) */
+    /* %REDMON_DOCNAME% etc. */
     i = lstrlen(prd->command);
     for (s = prd->config.szArguments; 
 	*s && (i < sizeof(prd->command)/sizeof(TCHAR)-1); s++) {
@@ -1455,6 +1848,15 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
 	    i = lstrlen(prd->command);
 	    s++;
         }
+	else if ( (*s == '%') && (*(s+1)=='b') &&
+	  (i+lstrlen(prd->pBaseName) < sizeof(prd->command)/sizeof(TCHAR)-1) )
+	{
+	    /* copy base name */
+	    prd->command[i] = '\0';
+	    lstrcat(prd->command, prd->pBaseName);
+	    i = lstrlen(prd->command);
+	    s++;
+        }
 	else if ( (*s == '%') && (*(s+1)=='d') &&
 	  (i+lstrlen(prd->pDocName) < sizeof(prd->command)/sizeof(TCHAR)-1) )
 	{
@@ -1463,7 +1865,7 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
 	    for (t = prd->pDocName; *t; t++) {
 		if ((*t != '<') && (*t != '>') && (*t != '\"') &&
 		    (*t != '|') && (*t != '/') && (*t != '\\') &&
-		    (*t != ':'))
+		    (*t != '?') && (*t != '*') && (*t != ':'))
 		    prd->command[i++] = *t;
 	    }
 	    prd->command[i] = '\0';
@@ -1512,7 +1914,8 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
     }
 
     prd->hmutex = CreateMutex(NULL, FALSE, NULL);
-    flag = start_redirect(prd);
+    if (flag)
+        flag = start_redirect(prd);
     if (flag) {
         WaitForInputIdle(prd->piProcInfo.hProcess, 5000);
 
@@ -1613,6 +2016,13 @@ redmon_start_doc_port(REDATA *prd, LPTSTR pPrinterName,
 	    prd->config.dwDelay, prd->config.dwRunUser);
 	write_string_to_log(prd, buf);
     }
+
+    /* We don't need our copy of the write end of the pipe handle, 
+     * since process has a copy. 
+     */
+    if (prd->hPipeWr != INVALID_HANDLE_VALUE);
+	CloseHandle(prd->hPipeWr);
+    prd->hPipeWr = INVALID_HANDLE_VALUE;
 
     if (!flag) {
 	/* close all file and object handles */
@@ -1716,8 +2126,9 @@ BOOL redmon_write_port(REDATA *prd, LPBYTE  pBuffer,
     if (!prd->started) {
 	if (prd->config.dwLogFileDebug) {
 	    wsprintf(buf, 
-	      TEXT("REDMON WritePort: called outside Start/EndDocPort.  Returning FALSE\r\n"));
-	    MessageBox(NULL, buf, MONITORNAME, MB_OK);
+	      TEXT("REDMON WritePort: called outside Start/EndDocPort, or StartDocPort get filename was cancelled.\r\n"));
+	    write_string_to_log(prd, buf);
+	    // MessageBox(NULL, buf, MONITORNAME, MB_OK);
 	}
 	return FALSE;
     }
@@ -1904,6 +2315,7 @@ BOOL redmon_end_doc_port(REDATA *prd)
     /* Close stdin to signal EOF */
     if (prd->hChildStdinWr != INVALID_HANDLE_VALUE)
 	CloseHandle(prd->hChildStdinWr);
+    prd->hChildStdinWr  = INVALID_HANDLE_VALUE;
 
     flush_stdout(prd);
 
@@ -1943,27 +2355,9 @@ BOOL redmon_end_doc_port(REDATA *prd)
      * side effects, don't do it yet.
      */
 
-    /* When the process terminates, it will close its copy of
-     * of the stdout & stderr pipe write handles. 
-     * The pipes remain open because we still have a handle to
-     * to the write end. 
-     * Close our copy of the write end of the stdout & stderr 
-     * pipes to flush them.
-     */
-    CloseHandle(prd->hChildStdoutWr);
-    CloseHandle(prd->hChildStderrWr);
-    if (prd->hPipeWr != INVALID_HANDLE_VALUE);
-        CloseHandle(prd->hPipeWr);
-
     /* copy anything on stdout/err to log file */
     flush_stdout(prd);
 
-    /* Close the read end of the stdio pipes */
-    CloseHandle(prd->hChildStderrRd);
-    CloseHandle(prd->hChildStdoutRd);
-    CloseHandle(prd->hChildStdinRd);
-    if (prd->hPipeWr != INVALID_HANDLE_VALUE);
-        CloseHandle(prd->hPipeRd);
 
     /* NT documentation says *we* should cancel the print job. */
     /* 95 documentation says nothing about this. */
@@ -2011,6 +2405,8 @@ BOOL redmon_end_doc_port(REDATA *prd)
 	write_string_to_log(prd, buf);
     }
 
+    /* Close all handles */
+
     if (prd->environment) {
 	/* Are we responsible for this, or does the process delete
 	 * its own environment? */
@@ -2019,8 +2415,11 @@ BOOL redmon_end_doc_port(REDATA *prd)
 	prd->environment = NULL;
     }
 
-    if (prd->config.dwRunUser)
+    // if (prd->config.dwRunUser) {
+    if (prd->primary_token != NULL) {
 	CloseHandle(prd->primary_token);
+	prd->primary_token = NULL;
+    }
 
     if (prd->config.dwLogFileDebug)
 	write_string_to_log(prd, 
@@ -2042,6 +2441,27 @@ BOOL redmon_end_doc_port(REDATA *prd)
 
     if (prd->piProcInfo.hThread != INVALID_HANDLE_VALUE)
 	CloseHandle(prd->piProcInfo.hThread);
+
+    /* Close the last of the pipes */
+    if (prd->hChildStderrRd)
+	CloseHandle(prd->hChildStderrRd);
+    if (prd->hChildStdoutRd)
+	CloseHandle(prd->hChildStdoutRd);
+
+    /* These should alerady be closed */
+    if (prd->hChildStderrWr)
+	CloseHandle(prd->hChildStderrWr);
+    if (prd->hChildStdoutWr)
+	CloseHandle(prd->hChildStdoutWr);
+    if (prd->hChildStdinRd)
+	CloseHandle(prd->hChildStdinRd);
+    if (prd->hChildStdinWr)
+	CloseHandle(prd->hChildStdinWr);
+    if (prd->hPipeRd)
+	CloseHandle(prd->hPipeRd);
+    if (prd->hPipeWr)
+	CloseHandle(prd->hPipeWr);
+
 
     reset_redata(prd);
 
@@ -2079,7 +2499,7 @@ redmon_set_port_timeouts(REDATA *prd, LPCOMMTIMEOUTS lpCTO, DWORD reserved)
  
 
 
-LRESULT APIENTRY 
+HOOKRETURN APIENTRY 
 GetSaveHookProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     if (message == WM_INITDIALOG) {
@@ -2143,6 +2563,13 @@ BOOL flag;
 appear on the correct session.
 Need to call this in spoolss.dll, so we need to load this
 DLL dynamically.
+This was used in NT4 local port monitor, but not in NT5 local port monitor.
+The NT5 local port monitor has no code for prompting for filename, so
+it must be done in the print spooler during OpenPrinter or StartDocPrinter
+while it still has the user session available.
+Since we can't modify the print spooler like Microsoft did for FILE:,
+we have to hack around
+to get the user session and do it ourselves.
 
 	hToken = RevertToPrinterSelf();
 */
@@ -2654,7 +3081,7 @@ redmon_print_error(REDATA *prd)
 
 
 /* Add Port dialog box */
-LRESULT CALLBACK 
+DLGRETURN CALLBACK 
 AddDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 #if defined(_WIN64) || defined(GWLP_USERDATA)
@@ -2667,7 +3094,7 @@ AddDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	    /* save pointer to port name */
 	    pconfig = (RECONFIG *)lParam;
 #if defined(_WIN64) || defined(GWLP_USERDATA)
-	    SetWindowLongPtr(hDlg, GWLP_USERDATA, (LONG_PTR)lParam);
+	    SetWindowLongPtr(hDlg, GWLP_USERDATA, (REDLONGPTR)lParam);
 #else
 	    SetWindowLong(hDlg, GWL_USERDATA, (LONG)lParam);
 #endif
@@ -2698,7 +3125,7 @@ AddDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 }
 
 /* Log file dialog box */
-LRESULT CALLBACK 
+DLGRETURN CALLBACK 
 LogfileDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch(message) {
@@ -2710,7 +3137,7 @@ LogfileDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	    /* save pointer to configuration data */
 #if defined(_WIN64) || defined(GWLP_USERDATA)
-	    SetWindowLongPtr(hDlg, GWLP_USERDATA, (LONG_PTR)lParam);
+	    SetWindowLongPtr(hDlg, GWLP_USERDATA, (REDLONGPTR)lParam);
 #else
 	    SetWindowLong(hDlg, GWL_USERDATA, (LONG)lParam);
 #endif
@@ -2846,7 +3273,7 @@ BOOL fail = FALSE;
 
 
 /* Configure Port dialog box */
-LRESULT CALLBACK 
+DLGRETURN CALLBACK 
 ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch(message) {
@@ -2868,7 +3295,7 @@ ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	    /* save pointer to configuration data */
 #if defined(_WIN64) || defined(GWLP_USERDATA)
-	    SetWindowLongPtr(hDlg, GWLP_USERDATA, (LONG_PTR)lParam);
+	    SetWindowLongPtr(hDlg, GWLP_USERDATA, (REDLONGPTR)lParam);
 #else
 	    SetWindowLong(hDlg, GWL_USERDATA, (LONG)lParam);
 #endif
@@ -2971,6 +3398,7 @@ ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	      case IDOK:
 		{
 		    BOOL success;
+		    int i;
 #if defined(_WIN64) || defined(GWLP_USERDATA)
 		    RECONFIG *config = 
 			    (RECONFIG *)GetWindowLongPtr(hDlg, GWLP_USERDATA);
@@ -2984,6 +3412,15 @@ ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			sizeof(config->szCommand)/sizeof(TCHAR) - 1);
 		    GetDlgItemText(hDlg, IDC_ARGS, config->szArguments, 
 			sizeof(config->szArguments)/sizeof(TCHAR) - 1);
+		    /* Remove trailing CRLF */
+		    for (i = lstrlen(config->szArguments) - 1; i>0; i--) {
+			if ((config->szArguments[i] == '\r') || 
+			    (config->szArguments[i] == '\n')) {
+			    config->szArguments[i] = '\0';
+			}
+			else
+			    break;
+		    }
 		    config->dwOutput = SendDlgItemMessage(hDlg, IDC_OUTPUT, 
 			CB_GETCURSEL, (WPARAM)0, (LPARAM)0);
 		    GetDlgItemText(hDlg, IDC_PRINTER, config->szPrinter, 
@@ -3015,6 +3452,98 @@ ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
             return(FALSE);
     }
 }
+
+#if defined(UNICODE) && (defined(NT40) || defined(NT50)) && !defined(__BORLANDC__)
+/* Retrieve the security token for the user we wish to impersonate */
+/* Thanks to Guy Hachlili at Cogniview for this code */
+/* This may pick the wrong session if the user is logged in twice */
+HANDLE get_token_for_user(LPCTSTR pUsername)
+{
+    DWORD dwProcesses[128], dwProcs;
+    HANDLE hToken, hFullToken = NULL;
+
+    /* no user */
+    if (pUsername == NULL)
+	return NULL;
+
+    /* Go over the list for running processes, and find one which */
+    /* has the same user */
+    if (EnumProcesses(dwProcesses, sizeof(DWORD)*128, &dwProcs)) {
+	DWORD i;
+	for (i=0;(hFullToken == NULL) && (i<min(dwProcs, 128));i++) {
+	    HANDLE hProc = 
+		OpenProcess(PROCESS_QUERY_INFORMATION|PROCESS_VM_READ, 
+		FALSE, dwProcesses[i]);
+	    if (hProc != NULL) {
+		if (OpenProcessToken(hProc, TOKEN_READ, &hToken)) {
+		    TOKEN_USER* pTU;
+		    DWORD dw;
+		    GetTokenInformation(hToken, TokenUser, NULL, 0, &dw);
+		    if (dw > 0) {
+			HGLOBAL hglobal = GlobalAlloc(GPTR, dw);
+			pTU = (TOKEN_USER*)GlobalLock(hglobal);
+			if (GetTokenInformation(hToken, TokenUser, pTU, 
+			    dw, &dw)) {
+			    TCHAR cName[255], cDomain[255];
+			    DWORD dwName = 255, dwDomain = 255;
+			    SID_NAME_USE use;
+			    if (LookupAccountSid(NULL, pTU->User.Sid, cName, 
+				&dwName, cDomain, &dwDomain, &use)) {
+				if (_tcscmp(cName, pUsername) == 0) {
+				    HANDLE hTemp;
+				    /* Found a process of the same user */
+				    /* Create a token */
+				    if (OpenProcessToken(hProc, 
+					STANDARD_RIGHTS_REQUIRED | 
+					TOKEN_ASSIGN_PRIMARY | 
+					TOKEN_DUPLICATE | 
+					TOKEN_IMPERSONATE | 
+					TOKEN_QUERY | 
+					TOKEN_QUERY_SOURCE | 
+					TOKEN_ADJUST_PRIVILEGES | 
+					TOKEN_ADJUST_GROUPS | 
+					TOKEN_ADJUST_DEFAULT, &hTemp)) {
+					SECURITY_ATTRIBUTES saAttr;
+					/* Set the bInheritHandle flag so */
+					/* pipe handles are inherited. */
+					saAttr.nLength = 
+					    sizeof(SECURITY_ATTRIBUTES);
+					saAttr.bInheritHandle = TRUE;
+					saAttr.lpSecurityDescriptor = NULL;
+					if (!DuplicateTokenEx(hTemp, 
+					    MAXIMUM_ALLOWED, NULL, 
+					    SecurityImpersonation, 
+					    TokenPrimary, 
+					    &hFullToken))
+					    hFullToken = NULL;
+					CloseHandle(hTemp);
+				    }
+				}
+			    }
+			}
+			GlobalUnlock(hglobal);
+			GlobalFree(hglobal);
+		    }
+		    CloseHandle(hToken);
+		    hToken = NULL;
+		}
+		CloseHandle(hProc);
+	    }
+	}
+    }
+
+    /* When we got here, there's either a user token or NULL */
+    return hFullToken;
+}
+
+void
+fill_primary_token(REDATA *prd)
+{
+    if (prd->primary_token == NULL)
+	prd->primary_token = get_token_for_user(prd->pUserName);
+}
+#endif
+
 
 BOOL
 get_job_info(REDATA *prd)
@@ -3118,17 +3647,21 @@ BOOL bTMP = FALSE;
     len = sizeof(REDMON_PORT) + 
           sizeof(REDMON_JOB) + 
           sizeof(REDMON_PRINTER) + 
+          sizeof(REDMON_OUTPUTPRINTER) + 
           sizeof(REDMON_MACHINE) + 
           sizeof(REDMON_USER) + 
           sizeof(REDMON_DOCNAME) + 
+          sizeof(REDMON_BASENAME) + 
           sizeof(REDMON_FILENAME) + 
           sizeof(REDMON_SESSIONID) + 
           (lstrlen(prd->portname) + 
           lstrlen(buf) + 1 +
           lstrlen(prd->pPrinterName) + 1 +
+          lstrlen(prd->config.szPrinter) + 1 +
           lstrlen(prd->pMachineName) + 1 +
           lstrlen(prd->pUserName) + 1 +
           lstrlen(prd->pDocName) + 1 +
+          lstrlen(prd->pBaseName) + 1 +
           lstrlen(prd->tempname) + 1 +
           lstrlen(prd->pSessionId) + 1 +
 	  1) * sizeof(TCHAR);
@@ -3152,9 +3685,11 @@ BOOL bTMP = FALSE;
     append_env(env, REDMON_PORT, sizeof(REDMON_PORT), prd->portname);
     append_env(env, REDMON_JOB, sizeof(REDMON_JOB), buf);
     append_env(env, REDMON_PRINTER, sizeof(REDMON_PRINTER), prd->pPrinterName);
+    append_env(env, REDMON_OUTPUTPRINTER, sizeof(REDMON_OUTPUTPRINTER), prd->config.szPrinter);
     append_env(env, REDMON_MACHINE, sizeof(REDMON_MACHINE), prd->pMachineName);
     append_env(env, REDMON_USER, sizeof(REDMON_USER), prd->pUserName);
     append_env(env, REDMON_DOCNAME, sizeof(REDMON_DOCNAME), prd->pDocName);
+    append_env(env, REDMON_BASENAME, sizeof(REDMON_BASENAME), prd->pBaseName);
     append_env(env, REDMON_FILENAME, sizeof(REDMON_FILENAME), prd->tempname);
     append_env(env, REDMON_SESSIONID, sizeof(REDMON_SESSIONID), prd->pSessionId);
     if (bTEMP)
@@ -3172,22 +3707,26 @@ void
 dump_env(REDATA *prd, LPTSTR env)
 {
 LPTSTR name, next;
-    write_string_to_log(prd, TEXT("Environment:\n  "));
+    write_string_to_log(prd, TEXT("Environment:\r\n  "));
     next = env;
     while (*next) {
         name = next;
 	while (*next)
 	    next++;
 	write_string_to_log(prd, name);
-	write_string_to_log(prd, TEXT("\n  "));
+	write_string_to_log(prd, TEXT("\r\n  "));
 	next++;
     }
-    write_string_to_log(prd, TEXT("\n"));
+    write_string_to_log(prd, TEXT("\r\n"));
 }
 
 BOOL make_env(REDATA * prd)
 {
-LPTSTR env, extra_env;
+LPTSTR env_block = NULL;
+LPTSTR env_strings = NULL;
+LPTSTR env = NULL;
+LPTSTR extra_env;
+BOOL destroy_env = FALSE;
 HGLOBAL h_extra_env;
     /* Add some environment variables */
     /* It would be simpler to use SetEnvironmentVariable()
@@ -3196,13 +3735,45 @@ HGLOBAL h_extra_env;
      * cause problems if two RedMon ports simultaneously
      * did this.
      */
-    env = GetEnvironmentStrings();
+
+
+    /* If environment already exists, then we created it 
+     * before asking for filename.
+     * Delete and recreate it to update REDMON_FILENAME.
+     */
+    if (prd->environment) {
+	GlobalUnlock(prd->environment);
+	GlobalFree(prd->environment);
+	prd->environment = NULL;
+    }
+
+#if defined(UNICODE) && (defined(NT40) || defined(NT50)) && !defined(__BORLANDC__)
+    if (prd->config.dwRunUser) {
+	BOOL flag;
+	TCHAR buf[MAXSTR];
+	fill_primary_token(prd);
+	if (prd->primary_token != NULL)
+	    if (!CreateEnvironmentBlock(&env_block, prd->primary_token, FALSE))
+		env_block = NULL;
+	if (env_block != NULL)
+	    env = env_block;
+    }
+#endif
+    if (env == NULL)
+	env = env_strings = GetEnvironmentStrings();
+
     h_extra_env= make_job_env(prd);
     extra_env = GlobalLock(h_extra_env);
     prd->environment = join_env(env, extra_env);
     GlobalUnlock(h_extra_env);
     GlobalFree(h_extra_env);
-    FreeEnvironmentStrings(env);
+
+#if defined(UNICODE) && (defined(NT40) || defined(NT50)) && !defined(__BORLANDC__)
+    if (env_block)
+	DestroyEnvironmentBlock(env_block);
+#endif
+    if (env_strings)
+        FreeEnvironmentStrings(env_strings);
 
     if (prd->hLogFile != INVALID_HANDLE_VALUE) {
         env = GlobalLock(prd->environment);
@@ -3417,10 +3988,16 @@ BOOL start_redirect(REDATA * prd)
 	 * Instead we try to put the process on the main desktop.
 	 * We need to change the DACL of the desktop, but I don't know
 	 * how to do this yet, so the desktop code is disabled.
-	 */
+	 * The following attempts to get the primary user token needed
+ 	 * to access the user desktop/session.
+ 	 */
+
 	/*
         siStartInfo.lpDesktop = "winsta0\\desktop";
 	*/
+
+	fill_primary_token(prd);
+
 	if ( !(flag = CreateProcessAsUser(prd->primary_token, NULL,
 		prd->command,  /* command line                       */
 		NULL,          /* process security attributes        */
@@ -3472,6 +4049,21 @@ BOOL start_redirect(REDATA * prd)
 	return FALSE;
 #endif
 
+    /* We now close our copy of the inheritable pipe handles.
+     * The other process still contains a copy of the pipe handle,
+     * so the pipe will stay open until the other end closes their
+     * handle.
+     */
+    if (prd->hChildStdinRd != INVALID_HANDLE_VALUE)
+	CloseHandle(prd->hChildStdinRd);
+    prd->hChildStdinRd = INVALID_HANDLE_VALUE;
+    if (prd->hChildStdoutWr != INVALID_HANDLE_VALUE)
+	CloseHandle(prd->hChildStdoutWr);
+    prd->hChildStdoutWr = INVALID_HANDLE_VALUE;
+    if (prd->hChildStderrWr != INVALID_HANDLE_VALUE)
+	CloseHandle(prd->hChildStderrWr);
+    prd->hChildStderrWr = INVALID_HANDLE_VALUE;
+
     return TRUE;
 }
 
@@ -3488,11 +4080,16 @@ BOOL get_filename_as_user(REDATA * prd)
     HANDLE hPipeWrite;
     HANDLE hPipeRead;
     LPVOID env;
-    TCHAR command[MAXSTR];
+    TCHAR command[MAXSTR*3];
+    TCHAR dllname[MAXSTR];
     BOOL flag = TRUE;
     HANDLE htoken;
     TCHAR buf[MAXSTR];
     DWORD dwBytesRead;
+    HANDLE pHandles[2];
+    DWORD dwWait;
+    DWORD exit_status;
+    int i;
 
     /* Set the bInheritHandle flag so pipe handles are inherited. */
     saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
@@ -3515,8 +4112,15 @@ BOOL get_filename_as_user(REDATA * prd)
     }
     CloseHandle(hPipeTemp);
 
-
-    wsprintf(command, TEXT("redmonfn.exe %lu %s"), hPipeWrite, prd->tempname);
+    /* This requires that the rundll32.exe be in the normal location
+     * and that the RedMon DLL is in a location with no spaces in
+     * the filename.
+     * If this breaks, then we will need to put the GetFileNameW code
+     * in a separate EXE.
+     */
+    GetModuleFileName(hdll, dllname, sizeof(dllname)/sizeof(TCHAR));
+    wsprintf(command, TEXT("C:\\Windows\\System32\\rundll32.exe %s,GetFileName %lu %s"), 
+	dllname, hPipeWrite, prd->tempname);
     write_string_to_log(prd, command);
     write_string_to_log(prd, TEXT("\r\n"));
 
@@ -3542,12 +4146,23 @@ BOOL get_filename_as_user(REDATA * prd)
     siStartInfo.hStdOutput = NULL;
     siStartInfo.hStdError = NULL;
 
+    /* make the environment block, which will need to 
+     * be recreated later to add REDMON_FILENAME
+     */
+    write_string_to_log(prd, TEXT("Creating environment before prompting for filename\r\n"));
+    make_env(prd);
     if (prd->environment)
         env = GlobalLock(prd->environment);
     else
 	env = NULL;
 
     /* Create the child process. */
+    fill_primary_token(prd);
+
+    /* Platform SDK documentation says we need to LoadUserProfile
+     * before calling CreateProcessAsUser, but since the user is
+     * is already logged in, it has already been done.
+     */
 
     /* CreateProcessAsUser is only supported by NT3.51 and later. */
     /* get impersonation token of current thread */
@@ -3594,20 +4209,66 @@ BOOL get_filename_as_user(REDATA * prd)
 	write_string_to_log(prd, buf);
 	write_error(prd, err);
     }
+    if (flag && (prd->piProcInfo.hProcess == INVALID_HANDLE_VALUE))
+	flag = FALSE;
+
+    /* Close our copy of the pipe write handle, so pipe will close
+     * when the other process terminates.
+     */
+    CloseHandle(hPipeWrite);
 
     /* read pipe to get filename */
-    if (flag)
-	flag = ReadFile(hPipeRead, buf, sizeof(buf)-1, &dwBytesRead, NULL);
+    dwBytesRead = 0;
+    buf[0] = '\0';
+    buf[1] = '\0';
+    /* Wait until the user enters a filename, */
+    /* or timeout if they do nothing for 'delay' seconds */
     if (flag) {
+        DWORD bytes_available = 0;
+        BOOL result;
+	pHandles[0] = hPipeRead;
+	pHandles[1] = prd->piProcInfo.hProcess;
+        for (i=0; i<prd->config.dwDelay; i++) {
+	    dwWait = WaitForMultipleObjects(2, pHandles, FALSE, 1000);
+	    if (dwWait == WAIT_OBJECT_0) {
+		/* Pipe has data */
+write_string_to_log(prd, TEXT("Starting reading filename from pipe\r\n"));
+		    flag = ReadFile(hPipeRead, buf, sizeof(buf)-1, 
+			&dwBytesRead, NULL);
+write_string_to_log(prd, TEXT("Finished reading filename from pipe\r\n"));
+		break;
+	    }
+	    else if (dwWait == WAIT_OBJECT_0 + 1) {
+write_string_to_log(prd, TEXT("GetFileNameW process has changed state\r\n"));
+		if (GetExitCodeProcess(prd->piProcInfo.hProcess, 
+		    &exit_status)) {
+		    if (exit_status != STILL_ACTIVE) {
+write_string_to_log(prd, TEXT("GetFileNameW has exited, so did not return a filename\r\n"));
+			break;
+		    }
+		}
+		/* Process ended without writing anything */
+		flag = FALSE;
+		break;
+	    }
+	    /* else if (dwWait == WAIT_TIMEOUT) */
+            Sleep(1000);
+	}
+    }
 
+    if (flag) {
 	if (dwBytesRead < sizeof(prd->tempname))
 	    CopyMemory(prd->tempname, buf, dwBytesRead);
-write_string_to_log(prd, TEXT("redmonfn.exe returns '"));
+write_string_to_log(prd, TEXT("GetFileNameW returns '"));
 write_string_to_log(prd, buf);
 write_string_to_log(prd, TEXT("'\r\n"));
 wsprintf(buf, TEXT("  read %d bytes\r\n"), dwBytesRead);
 write_string_to_log(prd, buf);
     }
+    else {
+	write_string_to_log(prd, TEXT("GetFileNameW cancelled"));
+    }
+
 
     if (prd->piProcInfo.hProcess != INVALID_HANDLE_VALUE) {
 	CloseHandle(prd->piProcInfo.hProcess);
@@ -3619,7 +4280,185 @@ write_string_to_log(prd, buf);
 	prd->piProcInfo.hThread = INVALID_HANDLE_VALUE;
     }
 
+    if (hPipeRead != INVALID_HANDLE_VALUE)
+        CloseHandle(hPipeRead);
+
+    if (prd->environment)
+	GlobalUnlock(prd->environment);
+
     return flag;
+}
+#endif
+
+
+void WriteLog(HANDLE hFile, LPCTSTR str)
+{
+    DWORD dwBytesWritten;
+    WriteFile(hFile, str, 
+	  lstrlen(str) * sizeof(TCHAR), &dwBytesWritten, NULL);
+}
+
+void
+WriteError(HANDLE hFile, DWORD err)
+{
+    LPVOID lpMessageBuffer;
+    DWORD dwBytesWritten = 0;
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+	FORMAT_MESSAGE_FROM_SYSTEM,
+	NULL, err,
+	MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), /* user default language */
+	(LPTSTR) &lpMessageBuffer, 0, NULL);
+    if (lpMessageBuffer) {
+	WriteFile(hFile, (LPTSTR)lpMessageBuffer, 
+	    lstrlen(lpMessageBuffer) * sizeof(TCHAR),
+	    &dwBytesWritten, NULL);
+	LocalFree(LocalHandle(lpMessageBuffer));
+    }
+}
+
+
+#ifdef UNICODE
+
+/* This is used to run on the client to get the file name.
+ *  rundll32 redmon.dll,GetFileName  pipehandle previous_name
+ * Note that the exported function is GetFileNameW, but we call
+ * it as GetFileName.  Windows finds that only GetFileNameW exists
+ * and so calls it with a Unicode command line.
+ * 
+ */
+__declspec(dllexport) void CALLBACK
+GetFileNameW(HWND hwnd, HINSTANCE hinst, LPTSTR lpCmdLine, int nCmdShow)
+{
+    LPTSTR command_line;
+    LPTSTR p;
+    HANDLE hPipe;
+    DWORD dwBytesWritten = 0;
+    OPENFILENAME ofn;
+    TCHAR cReplace;
+    TCHAR szFilter[MAXSTR];
+    TCHAR szDir[MAXSTR];
+    int i;
+    BOOL flag;
+    TCHAR szPipeName[MAXSTR];
+    TCHAR szFileName[MAXSTR];
+    DWORD dwLen;
+
+    /* Command line contains "pipename filename" */
+    dwLen = lstrlen(lpCmdLine);
+    for (i=0; i<dwLen; i++) {
+	if (lpCmdLine[i] != ' ')
+	    szPipeName[i] = lpCmdLine[i];
+	else {
+	    szPipeName[i] = '\0';
+	    break;
+	} 
+    }
+    for (;i<dwLen; i++) {
+	if (lpCmdLine[i] != ' ')
+	    break;
+    }
+
+    lstrcpy(szFileName, &lpCmdLine[i]);
+
+
+    hPipe = redmon_to_handle(szPipeName);
+
+    if (hPipe == INVALID_HANDLE_VALUE)
+	return;
+
+
+    FillMemory((PVOID)&ofn, sizeof(ofn), 0);
+    ofn.lStructSize = sizeof(OPENFILENAME);
+    ofn.hwndOwner = HWND_DESKTOP;
+    ofn.lpstrFile = szFileName;
+    ofn.nMaxFile = sizeof(szFileName)/sizeof(TCHAR)-1;
+    lstrcpyn(szFilter, TEXT("All Files (*.*)|*.*|PRN Documents (*.prn)|*.prn|PDF Documents (*.pdf)|*.pdf|PostScript Documents (*.ps)|*.ps|"), 
+	sizeof(szFilter)/sizeof(TCHAR)-1);
+    cReplace = szFilter[lstrlen(szFilter)-1];
+    for (i=0; szFilter[i] != '\0'; i++)
+	if (szFilter[i] == cReplace)
+	    szFilter[i] = '\0';
+    ofn.lpstrFilter = szFilter;
+    ofn.nFilterIndex = 0;
+
+    /* Split the directory name and filename */
+    if (lstrlen(ofn.lpstrFile)) {
+	lstrcpy(szDir, ofn.lpstrFile);
+	for (i=lstrlen(szDir)-1; i; i--) {
+	    if (szDir[i] == '\\') {
+		lstrcpy(ofn.lpstrFile, szDir+i+1);
+		szDir[i+1] = '\0';
+		ofn.lpstrInitialDir = szDir;
+		break;
+	    }
+	}
+    }
+
+    if ((ofn.lpstrInitialDir == NULL) || (ofn.lpstrInitialDir[0] == '\0')) {
+        if (GetEnvironmentVariable(TEXT("USERPROFILE"), szDir,
+	    sizeof(szDir)/sizeof(TCHAR)-1));
+	    ofn.lpstrInitialDir = szDir;
+    }
+
+    flag = GetSaveFileName(&ofn);
+
+    if (flag)
+	WriteFile(hPipe, szFileName, 
+	  (lstrlen(szFileName)+1) * sizeof(TCHAR), &dwBytesWritten, NULL);
+
+    CloseHandle(hPipe);
+    return;
+}
+
+/* This is used to get a filename if we are not using RunAsUser
+ * to make it appear in the user session.  Should only be used
+ * on Windows NT 2000 and earlier.
+ */
+BOOL get_filename_client(REDATA * prd, OPENFILENAME *pofn)
+{
+    BOOL fRet = TRUE;
+    HANDLE htoken = NULL, hduptoken = NULL;
+    TCHAR buf[MAXSTR];
+    DWORD dwSystemSessionId = 0;
+    DWORD dwClientSessionId = 0;
+    DWORD err;
+
+
+    if ( fRet ) {
+	DWORD dwRetLen = 0;
+	/* query session-id from token */
+	fRet = GetTokenInformation(hduptoken, TokenSessionId, 
+			   &dwClientSessionId, sizeof (DWORD), &dwRetLen);
+        CloseHandle(hduptoken);
+    }
+#ifdef DEBUG_REDMON
+    wsprintf(buf, TEXT("Client SessionId = %ld\r\n"), dwClientSessionId);
+    write_string_to_log(prd, buf);
+#endif
+
+    /* Get the servers session Id */
+    if ( fRet ) {
+	DWORD dwRetLen = 0;
+	/* query session-id from token */
+	fRet = GetTokenInformation(GetCurrentThread(), TokenSessionId, 
+		   &dwSystemSessionId, sizeof (DWORD), &dwRetLen);
+	if (fRet) {
+	    wsprintf(buf, TEXT("Failed to get system SessionId\r\n"));
+	    write_string_to_log(prd, buf);
+        }
+    }
+#ifdef DEBUG_REDMON
+    wsprintf(buf, TEXT("System SessionId = %ld\r\n"), dwSystemSessionId);
+    write_string_to_log(prd, buf);
+#endif
+    if (dwClientSessionId != dwSystemSessionId) {
+        write_string_to_log(prd, TEXT("Client session differs from print service.  Use 'Run as user' in the RedMon configuration.\r\n"));
+    }
+
+
+    fRet = GetSaveFileName(pofn);
+
+    return(fRet);
 }
 #endif
 
